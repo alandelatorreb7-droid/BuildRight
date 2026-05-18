@@ -34,21 +34,29 @@ export default function AdminLogin() {
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      background: 'var(--blue-dark)',
+      background: 'var(--bg)', padding: 24,
     }}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🏗️</div>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-          Build<span style={{ color: 'var(--rust)' }}>Right</span> Admin
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 10,
+          background: 'var(--rust)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 800, fontSize: '1rem', color: '#fff', letterSpacing: '-0.02em',
+          margin: '0 auto 16px',
+        }}>BR</div>
+        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.025em' }}>
+          BuildRight Admin
         </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: 4 }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: 4 }}>
           Price management panel
         </div>
       </div>
 
       <form onSubmit={handleSubmit} style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)', padding: 36, width: '100%', maxWidth: 380,
+        borderRadius: 'var(--radius-lg)', padding: 32,
+        width: '100%', maxWidth: 380,
+        boxShadow: 'var(--shadow-md)',
       }}>
         <div className="form-group">
           <label className="label">Admin Password</label>
@@ -64,17 +72,17 @@ export default function AdminLogin() {
         </div>
         {error && (
           <div style={{
-            background: '#3a1010', border: '1px solid #e74c3c',
+            background: '#FEF2F2', border: '1px solid #FECACA',
             borderRadius: 'var(--radius)', padding: '10px 14px',
-            color: '#e74c3c', fontSize: '0.85rem', marginBottom: 16,
+            color: '#991B1B', fontSize: '0.84rem', marginBottom: 16,
           }}>{error}</div>
         )}
         <button type="submit" className="btn btn-primary" disabled={loading}
-          style={{ width: '100%', justifyContent: 'center', fontSize: '0.95rem', padding: '12px' }}>
-          {loading ? 'Checking...' : 'Sign In'}
+          style={{ width: '100%', justifyContent: 'center', padding: '11px', fontSize: '0.9rem' }}>
+          {loading ? 'Checking…' : 'Sign In'}
         </button>
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>← Back to estimator</a>
+          <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>← Back to estimator</a>
         </div>
       </form>
     </div>

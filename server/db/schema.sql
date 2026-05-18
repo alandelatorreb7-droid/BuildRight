@@ -19,9 +19,13 @@ CREATE TABLE IF NOT EXISTS items (
   item_type VARCHAR(20) NOT NULL CHECK (item_type IN ('materials', 'labor', 'other')),
   is_active BOOLEAN DEFAULT TRUE,
   sort_order INTEGER DEFAULT 0,
+  price_updated_at DATE DEFAULT CURRENT_DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
 CREATE INDEX IF NOT EXISTS idx_items_active ON items(is_active);
+
+-- Safe migration for existing databases
+ALTER TABLE items ADD COLUMN IF NOT EXISTS price_updated_at DATE DEFAULT CURRENT_DATE;

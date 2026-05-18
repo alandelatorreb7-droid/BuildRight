@@ -31,16 +31,16 @@ router.get('/items', adminAuth, async (req, res) => {
 
 // POST create item
 router.post('/items', adminAuth, async (req, res) => {
-  const { category_id, name, description, unit, unit_price, item_type, sort_order } = req.body;
+  const { category_id, name, description, unit, unit_price, item_type, sort_order, price_updated_at } = req.body;
   if (!category_id || !name || !unit || unit_price == null || !item_type) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
     const result = await db.query(
-      `INSERT INTO items (category_id, name, description, unit, unit_price, item_type, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO items (category_id, name, description, unit, unit_price, item_type, sort_order, price_updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [category_id, name, description || null, unit, unit_price, item_type, sort_order || 0]
+      [category_id, name, description || null, unit, unit_price, item_type, sort_order || 0, price_updated_at || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -52,7 +52,7 @@ router.post('/items', adminAuth, async (req, res) => {
 // PUT update item
 router.put('/items/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { category_id, name, description, unit, unit_price, item_type, is_active, sort_order } = req.body;
+  const { category_id, name, description, unit, unit_price, item_type, is_active, sort_order, price_updated_at } = req.body;
   try {
     const result = await db.query(
       `UPDATE items
@@ -64,10 +64,11 @@ router.put('/items/:id', adminAuth, async (req, res) => {
            item_type = COALESCE($6, item_type),
            is_active = COALESCE($7, is_active),
            sort_order = COALESCE($8, sort_order),
+           price_updated_at = COALESCE($9, price_updated_at),
            updated_at = NOW()
-       WHERE id = $9
+       WHERE id = $10
        RETURNING *`,
-      [category_id, name, description, unit, unit_price, item_type, is_active, sort_order, id]
+      [category_id, name, description, unit, unit_price, item_type, is_active, sort_order, price_updated_at || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
     res.json(result.rows[0]);

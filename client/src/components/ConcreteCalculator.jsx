@@ -34,21 +34,23 @@ export default function ConcreteCalculator({ onAddCuYard }) {
 
   const set = (key, val) => setDims(d => ({ ...d, [key]: val }));
 
-  const fieldStyle = {
-    display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 100,
-  };
+  const fieldStyle = { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 100 };
   const row = { display: 'flex', gap: 12, flexWrap: 'wrap' };
 
   return (
-    <div style={{ marginBottom: 32 }}>
+    <div style={{ marginBottom: 24 }}>
       <div style={{
-        background: 'linear-gradient(135deg, var(--surface), var(--surface-2))',
+        background: 'var(--surface)',
         border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)', padding: 24,
+        borderRadius: 'var(--radius-lg)', padding: 20,
+        boxShadow: 'var(--shadow)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <span style={{ fontSize: '1.4rem' }}>📐</span>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Cubic Yard Calculator</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 15L8 1l7 14H1z"/>
+            <path d="M5 10h6"/>
+          </svg>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Cubic Yard Calculator</h3>
         </div>
 
         <div className="form-group">
@@ -103,29 +105,32 @@ export default function ConcreteCalculator({ onAddCuYard }) {
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <label className="label">Waste / Overage: {wastePct}%</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            <label className="label" style={{ marginBottom: 0 }}>Waste / Overage</label>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--amber)' }}>{wastePct}%</span>
+          </div>
           <input type="range" min="5" max="25" step="1" value={wastePct}
             onChange={e => setWastePct(Number(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--rust)' }} />
+            style={{ width: '100%', accentColor: 'var(--charcoal)' }} />
         </div>
 
         {cuYd > 0 && (
           <div style={{
-            marginTop: 20, padding: 16,
-            background: 'var(--blue-dark)', borderRadius: 'var(--radius)',
+            marginTop: 18, padding: 16,
+            background: 'var(--surface-2)', borderRadius: 'var(--radius)',
             border: '1px solid var(--border)',
-            display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'center', justifyContent: 'space-between',
+            display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between',
           }}>
             <div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Net volume</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {cuYd.toFixed(2)} <span style={{ fontSize: '0.9rem', fontWeight: 400 }}>cu yd</span>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: 2 }}>Net volume</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                {cuYd.toFixed(2)} <span style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--text-muted)' }}>cu yd</span>
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>With {wastePct}% waste</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--gold)' }}>
-                {cuYdWithWaste.toFixed(2)} <span style={{ fontSize: '0.9rem', fontWeight: 400 }}>cu yd</span>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: 2 }}>With {wastePct}% waste</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--amber)', letterSpacing: '-0.02em' }}>
+                {cuYdWithWaste.toFixed(2)} <span style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--text-muted)' }}>cu yd</span>
               </div>
             </div>
             {onAddCuYard && (

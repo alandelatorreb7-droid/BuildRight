@@ -1,26 +1,97 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 const fmt = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
-export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange }) {
-  const [margin, setMargin] = useState(15);
-  const [projectName, setProjectName] = useState('');
-  const [clientName, setClientName] = useState('');
-  const printRef = useRef();
+const COMMON_UNITS = ['ea', 'hr', 'sqft', 'lf', 'cy', 'ton', 'lb', 'day', 'wk', 'ls'];
+const TYPES = [
+  { value: 'materials', label: 'Materials' },
+  { value: 'labor',     label: 'Labor'     },
+  { value: 'other',     label: 'Other'     },
+];
 
+const EMPTY_CUSTOM = { name: '', qty: '1', unit: 'ea', price: '', type: 'other' };
+
+export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd }) {
+  const [margin,      setMargin]      = useState(15);
+  const [projectName, setProjectName] = useState('');
+  const [clientName,  setClientName]  = useState('');
+
+  // Contractor info — persisted separately so it survives "New Quote" resets
+  const [contractor, setContractor] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('buildright_contractor') || '{}'); }
+    catch { return {}; }
+  });
+  const [showContractor, setShowContractor] = useState(!contractor.companyName);
+  const updateContractor = (key, val) => setContractor(c => ({ ...c, [key]: val }));
+
+  useEffect(() => {
+    localStorage.setItem('buildright_contractor', JSON.stringify(contractor));
+  }, [contractor]);
+
+  // Custom item form
+  const [custom,      setCustom]      = useState(EMPTY_CUSTOM);
+  const [customError, setCustomError] = useState('');
+
+  const updateCustom = (key, val) => {
+    setCustom(c => ({ ...c, [key]: val }));
+    if (customError) setCustomError('');
+  };
+
+  const handleAddCustom = () => {
+    const price = parseFloat(custom.price);
+    const qty   = parseFloat(custom.qty) || 1;
+
+    if (!custom.name.trim())   { setCustomError('Item name is required.'); return; }
+    if (!(price > 0))          { setCustomError('Enter a valid unit price greater than 0.'); return; }
+
+    onAdd({
+      id:           `custom-${Date.now()}`,
+      name:         custom.name.trim(),
+      description:  '',
+      unit:         custom.unit.trim() || 'ea',
+      unit_price:   price,
+      item_type:    custom.type,
+      category_slug: 'custom',
+      qty,
+    });
+
+    // Clear name + price; keep unit and type for rapid batch entry
+    setCustom(c => ({ ...c, name: '', qty: '1', price: '' }));
+    setCustomError('');
+  };
+
+  const handleCustomKey = (e) => {
+    if (e.key === 'Enter') handleAddCustom();
+  };
+
+  // Calculations
   const materials = quoteItems.filter(i => i.item_type === 'materials');
   const labor     = quoteItems.filter(i => i.item_type === 'labor');
   const other     = quoteItems.filter(i => i.item_type === 'other');
 
-  const subtotal = (items) => items.reduce((s, i) => s + i.unit_price * i.qty, 0);
-  const matSub   = subtotal(materials);
-  const labSub   = subtotal(labor);
-  const othSub   = subtotal(other);
-  const base     = matSub + labSub + othSub;
-  const profit   = base * (margin / 100);
-  const total    = base + profit;
+  const sub    = (items) => items.reduce((s, i) => s + i.unit_price * i.qty, 0);
+  const matSub = sub(materials);
+  const labSub = sub(labor);
+  const othSub = sub(other);
+  const base   = matSub + labSub + othSub;
+  const profit = base * (margin / 100);
+  const total  = base + profit;
 
-  const handlePrint = () => window.print();
+  const hasItems = quoteItems.length > 0;
+
+  const handleDownloadPDF = async () => {
+    const { generatePDF } = await import('../utils/generatePDF');
+    generatePDF({
+      projectName, clientName,
+      companyName:       contractor.companyName  || '',
+      contractorPhone:   contractor.phone        || '',
+      contractorEmail:   contractor.email        || '',
+      contractorLicense: contractor.license      || '',
+      materials, labor, other,
+      matSub, labSub, othSub,
+      base, margin, profit, total,
+    });
+  };
 
   const handleCopy = async () => {
     const lines = [
@@ -48,166 +119,341 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange }) {
     alert('Quote copied to clipboard!');
   };
 
-  if (quoteItems.length === 0) {
-    return (
-      <div style={{
-        textAlign: 'center', padding: 48, color: 'var(--text-muted)',
-        background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
-        border: '1px dashed var(--border)',
-      }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📋</div>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>No items yet</div>
-        <div style={{ fontSize: '0.85rem' }}>Browse categories on the left and click "Add" to build your estimate.</div>
-      </div>
-    );
-  }
-
-  const Section = ({ title, badge, items, subtotal }) => (
-    items.length > 0 && (
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+  const Section = ({ title, badge, items, sectionSub }) => (
+    items.length > 0 ? (
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <span className={`badge badge-${badge}`}>{title}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{items.length} item{items.length !== 1 ? 's' : ''}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+            {items.length} item{items.length !== 1 ? 's' : ''}
+          </span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {items.map(item => (
             <div key={item.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '10px 14px',
-              background: 'var(--blue-dark)', borderRadius: 'var(--radius)',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px',
+              background: 'var(--surface)', borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-sm)',
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.845rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
                   {item.name}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {fmt(item.unit_price)} / {item.unit}
+                  {item.category_slug === 'custom' && (
+                    <span style={{ marginLeft: 6, color: 'var(--amber)', fontWeight: 500 }}>custom</span>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button className="btn btn-ghost btn-sm"
                   onClick={() => onQtyChange(item.id, Math.max(0.1, +(item.qty - 1).toFixed(2)))}
-                  style={{ padding: '4px 8px', minWidth: 28 }}>−</button>
+                  style={{ padding: '3px 7px', minWidth: 26 }}>−</button>
                 <input
                   type="number" min="0.01" step="0.01"
                   value={item.qty}
                   onChange={e => onQtyChange(item.id, Math.max(0.01, parseFloat(e.target.value) || 0))}
                   style={{
-                    width: 64, textAlign: 'center', padding: '4px 6px',
-                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    width: 58, textAlign: 'center', padding: '3px 5px',
+                    background: 'var(--bg)', border: '1px solid var(--border)',
                     borderRadius: 'var(--radius)', color: 'var(--text-primary)',
-                    fontSize: '0.85rem',
+                    fontSize: '0.82rem', fontFamily: 'var(--font)',
                   }} />
                 <button className="btn btn-ghost btn-sm"
                   onClick={() => onQtyChange(item.id, +(item.qty + 1).toFixed(2))}
-                  style={{ padding: '4px 8px', minWidth: 28 }}>+</button>
+                  style={{ padding: '3px 7px', minWidth: 26 }}>+</button>
               </div>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', minWidth: 80, textAlign: 'right', color: '#fff' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.875rem', minWidth: 74, textAlign: 'right', color: 'var(--text-primary)' }}>
                 {fmt(item.unit_price * item.qty)}
               </div>
               <button className="btn btn-danger btn-sm" onClick={() => onRemove(item.id)}
-                title="Remove item" style={{ padding: '4px 8px' }}>✕</button>
+                title="Remove item" style={{ padding: '3px 7px' }}>✕</button>
             </div>
           ))}
         </div>
-        <div style={{ textAlign: 'right', marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Subtotal: <strong style={{ color: 'var(--text-primary)' }}>{fmt(subtotal)}</strong>
+        <div style={{ textAlign: 'right', marginTop: 7, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          Subtotal: <strong style={{ color: 'var(--text-primary)' }}>{fmt(sectionSub)}</strong>
         </div>
       </div>
-    )
+    ) : null
   );
 
   return (
     <div>
-      {/* Project Info */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }} className="no-print">
-        <div style={{ flex: 1, minWidth: 180 }}>
+
+      {/* ── Contractor info ── */}
+      <div style={{
+        marginBottom: 18,
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+      }} className="no-print">
+        <button
+          onClick={() => setShowContractor(s => !s)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            Your Company
+          </span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!showContractor && contractor.companyName && (
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{contractor.companyName}</span>
+            )}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              style={{ transform: showContractor ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+              <path d="M2 4l4 4 4-4"/>
+            </svg>
+          </span>
+        </button>
+        {showContractor && (
+          <div style={{ padding: '0 14px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label className="label">Company Name</label>
+              <input className="input" placeholder="Smith Construction LLC"
+                value={contractor.companyName || ''} onChange={e => updateContractor('companyName', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input className="input" placeholder="(915) 555-0100"
+                value={contractor.phone || ''} onChange={e => updateContractor('phone', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Email</label>
+              <input className="input" placeholder="info@company.com"
+                value={contractor.email || ''} onChange={e => updateContractor('email', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">License #</label>
+              <input className="input" placeholder="TX-GC-12345"
+                value={contractor.license || ''} onChange={e => updateContractor('license', e.target.value)} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Project / client info ── */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }} className="no-print">
+        <div style={{ flex: 1, minWidth: 150 }}>
           <label className="label">Project Name</label>
-          <input className="input" placeholder="e.g. Smith Residence Addition"
+          <input className="input" placeholder="Smith Residence Addition"
             value={projectName} onChange={e => setProjectName(e.target.value)} />
         </div>
-        <div style={{ flex: 1, minWidth: 180 }}>
+        <div style={{ flex: 1, minWidth: 150 }}>
           <label className="label">Client / Contact</label>
-          <input className="input" placeholder="e.g. John Smith"
+          <input className="input" placeholder="John Smith"
             value={clientName} onChange={e => setClientName(e.target.value)} />
         </div>
       </div>
 
-      {/* Print header */}
-      <div style={{ display: 'none' }} className="print-only">
-        <h2>BuildRight — Construction Estimate</h2>
-        <p>Project: {projectName || '—'} | Client: {clientName || '—'} | Date: {new Date().toLocaleDateString()}</p>
-        <hr />
-      </div>
+      {/* ── Items ── */}
+      {hasItems ? (
+        <>
+          <Section title="Materials" badge="materials" items={materials} sectionSub={matSub} />
+          <Section title="Labor"     badge="labor"     items={labor}     sectionSub={labSub} />
+          <Section title="Other"     badge="other"     items={other}     sectionSub={othSub} />
+        </>
+      ) : (
+        <div style={{
+          padding: '20px 0 16px', textAlign: 'center',
+          color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.6,
+        }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"
+            strokeLinecap="round" strokeLinejoin="round"
+            style={{ display: 'block', margin: '0 auto 10px', opacity: 0.3 }}>
+            <rect x="4" y="2" width="16" height="20" rx="2"/>
+            <path d="M8 7h8M8 11h8M8 15h4"/>
+          </svg>
+          Browse categories on the left and click <strong>Add</strong>,<br/>or enter a custom item below.
+        </div>
+      )}
 
-      <Section title="Materials" badge="materials" items={materials} subtotal={matSub} />
-      <Section title="Labor"     badge="labor"     items={labor}     subtotal={labSub} />
-      <Section title="Other"     badge="other"     items={other}     subtotal={othSub} />
-
-      {/* Margin slider */}
+      {/* ── Custom item form ── */}
       <div style={{
-        background: 'var(--surface-2)', borderRadius: 'var(--radius-lg)',
-        padding: 20, marginBottom: 20, border: '1px solid var(--border)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        background: 'var(--bg)',
+        overflow: 'hidden',
+        marginBottom: hasItems ? 16 : 0,
       }} className="no-print">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Profit / Overhead Margin</label>
-          <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: '1.1rem' }}>{margin}%</span>
+
+        {/* Section label */}
+        <div style={{
+          padding: '9px 14px',
+          borderBottom: '1px solid var(--border)',
+          fontSize: '0.72rem', fontWeight: 600,
+          color: 'var(--text-muted)',
+          textTransform: 'uppercase', letterSpacing: '0.07em',
+        }}>
+          Custom Item
         </div>
-        <input type="range" min="0" max="50" step="1" value={margin}
-          onChange={e => setMargin(Number(e.target.value))}
-          style={{ width: '100%', accentColor: 'var(--rust)' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-          <span>0%</span><span>25%</span><span>50%</span>
+
+        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+          {/* Row 1: name + type */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="input"
+              placeholder="Item description"
+              value={custom.name}
+              onChange={e => updateCustom('name', e.target.value)}
+              onKeyDown={handleCustomKey}
+              style={{ flex: 1 }}
+            />
+            <select
+              className="select"
+              value={custom.type}
+              onChange={e => updateCustom('type', e.target.value)}
+              style={{ width: 102, flexShrink: 0 }}
+            >
+              {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+
+          {/* Row 2: qty + unit + price + add */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <label className="label" style={{ marginBottom: 0 }}>Qty</label>
+              <input
+                className="input"
+                type="number" min="0.01" step="any"
+                placeholder="1"
+                value={custom.qty}
+                onChange={e => updateCustom('qty', e.target.value)}
+                onKeyDown={handleCustomKey}
+                style={{ width: 54 }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <label className="label" style={{ marginBottom: 0 }}>Unit</label>
+              <input
+                className="input"
+                list="unit-suggestions"
+                placeholder="ea"
+                value={custom.unit}
+                onChange={e => updateCustom('unit', e.target.value)}
+                onKeyDown={handleCustomKey}
+                style={{ width: 70 }}
+              />
+              <datalist id="unit-suggestions">
+                {COMMON_UNITS.map(u => <option key={u} value={u} />)}
+              </datalist>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+              <label className="label" style={{ marginBottom: 0 }}>Unit Price</label>
+              <input
+                className="input"
+                type="number" min="0" step="0.01"
+                placeholder="0.00"
+                value={custom.price}
+                onChange={e => updateCustom('price', e.target.value)}
+                onKeyDown={handleCustomKey}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <label className="label" style={{ marginBottom: 0, visibility: 'hidden' }}>Add</label>
+              <button
+                className="btn btn-primary"
+                onClick={handleAddCustom}
+                style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+
+          {customError && (
+            <div style={{
+              fontSize: '0.78rem', color: '#991B1B',
+              background: '#FEF2F2', border: '1px solid #FECACA',
+              borderRadius: 'var(--radius)', padding: '6px 10px',
+            }}>
+              {customError}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Totals */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--blue-mid), var(--surface-3))',
-        borderRadius: 'var(--radius-lg)', padding: 20,
-        border: '1px solid var(--border-light)',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Materials</span>
-            <span>{fmt(matSub)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Labor</span>
-            <span>{fmt(labSub)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Other</span>
-            <span>{fmt(othSub)}</span>
-          </div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Base Cost</span>
-            <span>{fmt(base)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-            <span style={{ color: 'var(--gold)' }}>Margin ({margin}%)</span>
-            <span style={{ color: 'var(--gold)' }}>{fmt(profit)}</span>
-          </div>
+      {/* ── Margin, totals, actions (only when items exist) ── */}
+      {hasItems && (
+        <>
+          {/* Margin slider */}
           <div style={{
-            borderTop: '2px solid var(--rust)', paddingTop: 12, marginTop: 4,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>TOTAL ESTIMATE</span>
-            <span style={{ fontWeight: 700, fontSize: '1.4rem', color: 'var(--rust-light)' }}>{fmt(total)}</span>
+            background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
+            padding: 16, marginBottom: 16,
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-sm)',
+          }} className="no-print">
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Profit / Overhead Margin</label>
+              <span style={{ color: 'var(--amber)', fontWeight: 700, fontSize: '1rem' }}>{margin}%</span>
+            </div>
+            <input type="range" min="0" max="50" step="1" value={margin}
+              onChange={e => setMargin(Number(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--charcoal)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              <span>0%</span><span>25%</span><span>50%</span>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }} className="no-print">
-        <button className="btn btn-primary btn-lg" onClick={handlePrint}>
-          🖨️ Print Quote
-        </button>
-        <button className="btn btn-secondary btn-lg" onClick={handleCopy}>
-          📋 Copy to Clipboard
-        </button>
-      </div>
+          {/* Totals */}
+          <div style={{
+            background: 'var(--surface)',
+            borderRadius: 'var(--radius-lg)', padding: 18,
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow)',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Materials</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{fmt(matSub)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Labor</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{fmt(labSub)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Other</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{fmt(othSub)}</span>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 9, display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Base Cost</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{fmt(base)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--amber)', fontWeight: 500 }}>Margin ({margin}%)</span>
+                <span style={{ color: 'var(--amber)', fontWeight: 500 }}>{fmt(profit)}</span>
+              </div>
+              <div style={{
+                borderTop: '2px solid var(--border-dark)', paddingTop: 11, marginTop: 2,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Total Estimate</span>
+                <span style={{ fontWeight: 700, fontSize: '1.3rem', color: 'var(--rust)', letterSpacing: '-0.02em' }}>{fmt(total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }} className="no-print">
+            <button className="btn btn-primary btn-lg" onClick={handleDownloadPDF} style={{ flex: 1 }}>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7.5 1v9M4 7l3.5 3.5L11 7"/><path d="M1 11v2a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2"/>
+              </svg>
+              Download PDF
+            </button>
+            <button className="btn btn-secondary btn-lg" onClick={handleCopy} style={{ flex: 1 }}>
+              Copy to Clipboard
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
