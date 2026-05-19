@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const fmt = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
@@ -11,12 +11,75 @@ const TYPES = [
 
 const EMPTY_CUSTOM = { name: '', qty: '1', unit: 'ea', price: '', type: 'other' };
 
-export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd }) {
+// ── Inline-editable unit price ────────────────────────────────────────────────
+
+function PriceInput({ item, onPriceChange }) {
+  const [focused, setFocused]   = useState(false);
+  const [hovered, setHovered]   = useState(false);
+  const [rawVal,  setRawVal]    = useState('');
+  const inputRef                = useRef(null);
+
+  const handleFocus = () => {
+    setRawVal(String(item.unit_price));
+    setFocused(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const handleBlur = () => {
+    const p = parseFloat(rawVal);
+    if (p > 0 && p !== item.unit_price) onPriceChange(item.id, p);
+    setFocused(false);
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter') { e.target.blur(); }
+    if (e.key === 'Escape') { setFocused(false); setRawVal(''); e.target.blur(); }
+  };
+
+  const borderColor = focused
+    ? 'var(--charcoal)'
+    : hovered
+      ? 'var(--border-dark)'
+      : 'transparent';
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={focused ? rawVal : fmt(item.unit_price)}
+      onChange={e => setRawVal(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKey}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title="Click to edit price"
+      style={{
+        border: 'none',
+        borderBottom: `1.5px ${focused ? 'solid' : 'dashed'} ${borderColor}`,
+        background: focused ? 'var(--bg)' : 'transparent',
+        color: 'var(--text-muted)',
+        fontSize: '0.75rem',
+        fontFamily: 'var(--font)',
+        width: focused ? 80 : 72,
+        padding: focused ? '1px 4px' : '1px 2px',
+        borderRadius: focused ? '3px 3px 0 0' : 0,
+        cursor: 'text',
+        outline: 'none',
+        transition: 'border-color 0.15s, background 0.15s, width 0.1s',
+        textAlign: 'left',
+      }}
+    />
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPriceChange, onAdd }) {
   const [margin,      setMargin]      = useState(15);
   const [projectName, setProjectName] = useState('');
   const [clientName,  setClientName]  = useState('');
 
-  // Contractor info — persisted separately so it survives "New Quote" resets
   const [contractor, setContractor] = useState(() => {
     try { return JSON.parse(localStorage.getItem('buildright_contractor') || '{}'); }
     catch { return {}; }
@@ -28,9 +91,9 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
     localStorage.setItem('buildright_contractor', JSON.stringify(contractor));
   }, [contractor]);
 
-  // Custom item form
-  const [custom,      setCustom]      = useState(EMPTY_CUSTOM);
-  const [customError, setCustomError] = useState('');
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [custom,         setCustom]         = useState(EMPTY_CUSTOM);
+  const [customError,    setCustomError]    = useState('');
 
   const updateCustom = (key, val) => {
     setCustom(c => ({ ...c, [key]: val }));
@@ -40,31 +103,26 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
   const handleAddCustom = () => {
     const price = parseFloat(custom.price);
     const qty   = parseFloat(custom.qty) || 1;
-
-    if (!custom.name.trim())   { setCustomError('Item name is required.'); return; }
-    if (!(price > 0))          { setCustomError('Enter a valid unit price greater than 0.'); return; }
+    if (!custom.name.trim())  { setCustomError('Item name is required.'); return; }
+    if (!(price > 0))         { setCustomError('Enter a valid unit price greater than 0.'); return; }
 
     onAdd({
-      id:           `custom-${Date.now()}`,
-      name:         custom.name.trim(),
-      description:  '',
-      unit:         custom.unit.trim() || 'ea',
-      unit_price:   price,
-      item_type:    custom.type,
+      id:            `custom-${Date.now()}`,
+      name:          custom.name.trim(),
+      description:   '',
+      unit:          custom.unit.trim() || 'ea',
+      unit_price:    price,
+      item_type:     custom.type,
       category_slug: 'custom',
       qty,
     });
 
-    // Clear name + price; keep unit and type for rapid batch entry
     setCustom(c => ({ ...c, name: '', qty: '1', price: '' }));
     setCustomError('');
   };
 
-  const handleCustomKey = (e) => {
-    if (e.key === 'Enter') handleAddCustom();
-  };
+  const handleCustomKey = (e) => { if (e.key === 'Enter') handleAddCustom(); };
 
-  // Calculations
   const materials = quoteItems.filter(i => i.item_type === 'materials');
   const labor     = quoteItems.filter(i => i.item_type === 'labor');
   const other     = quoteItems.filter(i => i.item_type === 'other');
@@ -141,10 +199,11 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
                 <div style={{ fontSize: '0.845rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
                   {item.name}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {fmt(item.unit_price)} / {item.unit}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
+                  <PriceInput item={item} onPriceChange={onPriceChange} />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ {item.unit}</span>
                   {item.category_slug === 'custom' && (
-                    <span style={{ marginLeft: 6, color: 'var(--amber)', fontWeight: 500 }}>custom</span>
+                    <span style={{ marginLeft: 4, fontSize: '0.72rem', color: 'var(--amber)', fontWeight: 500 }}>custom</span>
                   )}
                 </div>
               </div>
@@ -187,10 +246,8 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
       {/* ── Contractor info ── */}
       <div style={{
         marginBottom: 18,
-        background: 'var(--bg)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
+        background: 'var(--bg)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
       }} className="no-print">
         <button
           onClick={() => setShowContractor(s => !s)}
@@ -270,125 +327,159 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
             <rect x="4" y="2" width="16" height="20" rx="2"/>
             <path d="M8 7h8M8 11h8M8 15h4"/>
           </svg>
-          Browse categories on the left and click <strong>Add</strong>,<br/>or enter a custom item below.
+          Browse categories on the left and click <strong>Add</strong>,<br/>or add a custom item below.
         </div>
       )}
 
-      {/* ── Custom item form ── */}
-      <div style={{
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)',
-        background: 'var(--bg)',
-        overflow: 'hidden',
-        marginBottom: hasItems ? 16 : 0,
-      }} className="no-print">
-
-        {/* Section label */}
-        <div style={{
-          padding: '9px 14px',
-          borderBottom: '1px solid var(--border)',
-          fontSize: '0.72rem', fontWeight: 600,
-          color: 'var(--text-muted)',
-          textTransform: 'uppercase', letterSpacing: '0.07em',
-        }}>
-          Custom Item
-        </div>
-
-        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-          {/* Row 1: name + type */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="input"
-              placeholder="Item description"
-              value={custom.name}
-              onChange={e => updateCustom('name', e.target.value)}
-              onKeyDown={handleCustomKey}
-              style={{ flex: 1 }}
-            />
-            <select
-              className="select"
-              value={custom.type}
-              onChange={e => updateCustom('type', e.target.value)}
-              style={{ width: 102, flexShrink: 0 }}
-            >
-              {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-
-          {/* Row 2: qty + unit + price + add */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label className="label" style={{ marginBottom: 0 }}>Qty</label>
-              <input
-                className="input"
-                type="number" min="0.01" step="any"
-                placeholder="1"
-                value={custom.qty}
-                onChange={e => updateCustom('qty', e.target.value)}
-                onKeyDown={handleCustomKey}
-                style={{ width: 54 }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label className="label" style={{ marginBottom: 0 }}>Unit</label>
-              <input
-                className="input"
-                list="unit-suggestions"
-                placeholder="ea"
-                value={custom.unit}
-                onChange={e => updateCustom('unit', e.target.value)}
-                onKeyDown={handleCustomKey}
-                style={{ width: 70 }}
-              />
-              <datalist id="unit-suggestions">
-                {COMMON_UNITS.map(u => <option key={u} value={u} />)}
-              </datalist>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
-              <label className="label" style={{ marginBottom: 0 }}>Unit Price</label>
-              <input
-                className="input"
-                type="number" min="0" step="0.01"
-                placeholder="0.00"
-                value={custom.price}
-                onChange={e => updateCustom('price', e.target.value)}
-                onKeyDown={handleCustomKey}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <label className="label" style={{ marginBottom: 0, visibility: 'hidden' }}>Add</label>
-              <button
-                className="btn btn-primary"
-                onClick={handleAddCustom}
-                style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}
-              >
-                + Add
-              </button>
-            </div>
-          </div>
-
-          {customError && (
+      {/* ── Add Custom Item ── */}
+      <div className="no-print" style={{ marginBottom: hasItems ? 16 : 0 }}>
+        {!showCustomForm ? (
+          <button
+            onClick={() => setShowCustomForm(true)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '9px 14px',
+              background: 'var(--bg)', border: '1px dashed var(--border)',
+              borderRadius: 'var(--radius-lg)', cursor: 'pointer',
+              fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-muted)',
+              transition: 'border-color 0.15s, color 0.15s, background 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--border-dark)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+              e.currentTarget.style.background = 'var(--surface-2)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.background = 'var(--bg)';
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M6.5 1v11M1 6.5h11"/>
+            </svg>
+            Add Custom Item
+          </button>
+        ) : (
+          <div style={{
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            background: 'var(--bg)',
+            overflow: 'hidden',
+          }}>
             <div style={{
-              fontSize: '0.78rem', color: '#991B1B',
-              background: '#FEF2F2', border: '1px solid #FECACA',
-              borderRadius: 'var(--radius)', padding: '6px 10px',
+              padding: '9px 14px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              {customError}
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                Custom Item
+              </span>
+              <button
+                onClick={() => { setShowCustomForm(false); setCustom(EMPTY_CUSTOM); setCustomError(''); }}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1,
+                  padding: '2px 5px', borderRadius: 'var(--radius)',
+                }}
+              >✕</button>
             </div>
-          )}
-        </div>
+
+            <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Row 1: name + type */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="input"
+                  placeholder="Item description"
+                  value={custom.name}
+                  onChange={e => updateCustom('name', e.target.value)}
+                  onKeyDown={handleCustomKey}
+                  style={{ flex: 1 }}
+                  autoFocus
+                />
+                <select
+                  className="select"
+                  value={custom.type}
+                  onChange={e => updateCustom('type', e.target.value)}
+                  style={{ width: 102, flexShrink: 0 }}
+                >
+                  {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+
+              {/* Row 2: qty + unit + price + add */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <label className="label" style={{ marginBottom: 0 }}>Qty</label>
+                  <input
+                    className="input"
+                    type="number" min="0.01" step="any"
+                    placeholder="1"
+                    value={custom.qty}
+                    onChange={e => updateCustom('qty', e.target.value)}
+                    onKeyDown={handleCustomKey}
+                    style={{ width: 54 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <label className="label" style={{ marginBottom: 0 }}>Unit</label>
+                  <input
+                    className="input"
+                    list="unit-suggestions"
+                    placeholder="ea"
+                    value={custom.unit}
+                    onChange={e => updateCustom('unit', e.target.value)}
+                    onKeyDown={handleCustomKey}
+                    style={{ width: 70 }}
+                  />
+                  <datalist id="unit-suggestions">
+                    {COMMON_UNITS.map(u => <option key={u} value={u} />)}
+                  </datalist>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+                  <label className="label" style={{ marginBottom: 0 }}>Unit Price</label>
+                  <input
+                    className="input"
+                    type="number" min="0" step="0.01"
+                    placeholder="0.00"
+                    value={custom.price}
+                    onChange={e => updateCustom('price', e.target.value)}
+                    onKeyDown={handleCustomKey}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <label className="label" style={{ marginBottom: 0, visibility: 'hidden' }}>Add</label>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleAddCustom}
+                    style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+
+              {customError && (
+                <div style={{
+                  fontSize: '0.78rem', color: '#991B1B',
+                  background: '#FEF2F2', border: '1px solid #FECACA',
+                  borderRadius: 'var(--radius)', padding: '6px 10px',
+                }}>
+                  {customError}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Margin, totals, actions (only when items exist) ── */}
+      {/* ── Margin, totals, actions ── */}
       {hasItems && (
         <>
-          {/* Margin slider */}
           <div style={{
             background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
             padding: 16, marginBottom: 16,
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-sm)',
+            border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)',
           }} className="no-print">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <label style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Profit / Overhead Margin</label>
@@ -402,12 +493,9 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
             </div>
           </div>
 
-          {/* Totals */}
           <div style={{
-            background: 'var(--surface)',
-            borderRadius: 'var(--radius-lg)', padding: 18,
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow)',
+            background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: 18,
+            border: '1px solid var(--border)', boxShadow: 'var(--shadow)',
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
@@ -440,7 +528,6 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onAdd 
             </div>
           </div>
 
-          {/* Actions */}
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }} className="no-print">
             <button className="btn btn-primary btn-lg" onClick={handleDownloadPDF} style={{ flex: 1 }}>
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

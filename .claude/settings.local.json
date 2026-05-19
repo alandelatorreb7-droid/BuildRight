@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(psql *)"
+      "PowerShell(psql *)",
+      "Bash(npm run *)",
+      "Bash(npm install *)"
     ]
   }
 }
