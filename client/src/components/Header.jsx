@@ -30,26 +30,6 @@ export default function Header() {
           </div>
         </Link>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <a
-            href="/admin"
-            style={{
-              fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)',
-              padding: '6px 12px', borderRadius: 'var(--radius)',
-              transition: 'color 0.15s, background 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.9)';
-              e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.45)';
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
-            Admin
-          </a>
-        </nav>
       </div>
     </header>
   );

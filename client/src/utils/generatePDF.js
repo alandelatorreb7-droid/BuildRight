@@ -22,6 +22,8 @@ export function generatePDF({
   materials, labor, other,
   matSub, labSub, othSub,
   base, margin, profit, total,
+  notes,
+  estimateNo,
 }) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const W  = doc.internal.pageSize.getWidth();   // 215.9 mm
@@ -71,16 +73,16 @@ export function generatePDF({
   set('helvetica', 'bold', 22, RST);
   doc.text('ESTIMATE', W - MR, 35, { align: 'right' });
 
-  const estimateNo = `EST-${new Date().getFullYear()}` +
-    `${String(new Date().getMonth() + 1).padStart(2, '0')}` +
-    `${String(new Date().getDate()).padStart(2, '0')}-` +
-    `${String(Math.floor(Math.random() * 9000) + 1000)}`;
+  const usedEstimateNo = estimateNo || (() => {
+    const now = new Date();
+    return `EST-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+  })();
   const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
 
   set('helvetica', 'normal', 8.5, MUT);
-  doc.text(`No. ${estimateNo}`, W - MR, 44,   { align: 'right' });
+  doc.text(`No. ${usedEstimateNo}`, W - MR, 44,   { align: 'right' });
   doc.text(dateStr,             W - MR, 49.5, { align: 'right' });
 
   let y = Math.max(leftY, 54) + 5;
@@ -275,11 +277,10 @@ export function generatePDF({
   y += 5;
 
   set('helvetica', 'normal', 8, MUT);
-  const noteLines = [
-    'This estimate is valid for 30 days from the date shown above. Prices reflect current material and labor costs',
-    'for El Paso, TX (2024/2025). Final costs may vary based on actual site conditions and material availability.',
-    'Payment terms: 50% deposit upon contract signing, balance due upon project completion.',
-  ];
+  const notesContent = notes && notes.trim()
+    ? notes.trim()
+    : 'This estimate is valid for 30 days from the date shown above. Prices reflect current material and labor costs for El Paso, TX. Final costs may vary based on actual site conditions and material availability.';
+  const noteLines = doc.splitTextToSize(notesContent, CW);
   noteLines.forEach(line => { doc.text(line, ML, y); y += 4.5; });
 
   // ── 8. Signature lines ────────────────────────────────────────────────────

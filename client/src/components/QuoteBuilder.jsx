@@ -75,11 +75,14 @@ function PriceInput({ item, onPriceChange }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPriceChange, onAdd }) {
-  const [margin,      setMargin]      = useState(15);
-  const [projectName, setProjectName] = useState('');
-  const [clientName,  setClientName]  = useState('');
-
+export default function QuoteBuilder({
+  quoteItems, onRemove, onQtyChange, onPriceChange, onAdd,
+  projectName, onProjectNameChange,
+  clientName,  onClientNameChange,
+  margin,      onMarginChange,
+  notes,       onNotesChange,
+  estimateNo,  onEstimateNoChange,
+}) {
   const [contractor, setContractor] = useState(() => {
     try { return JSON.parse(localStorage.getItem('buildright_contractor') || '{}'); }
     catch { return {}; }
@@ -139,6 +142,14 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPric
 
   const handleDownloadPDF = async () => {
     const { generatePDF } = await import('../utils/generatePDF');
+
+    let usedEstimateNo = estimateNo;
+    if (!usedEstimateNo) {
+      const now = new Date();
+      usedEstimateNo = `EST-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      onEstimateNoChange(usedEstimateNo);
+    }
+
     generatePDF({
       projectName, clientName,
       companyName:       contractor.companyName  || '',
@@ -148,6 +159,8 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPric
       materials, labor, other,
       matSub, labSub, othSub,
       base, margin, profit, total,
+      notes,
+      estimateNo: usedEstimateNo,
     });
   };
 
@@ -172,70 +185,123 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPric
       `Base Cost: ${fmt(base)}`,
       `Profit / Overhead (${margin}%): ${fmt(profit)}`,
       `TOTAL ESTIMATE: ${fmt(total)}`,
+      ...(notes ? ['', '--- NOTES ---', notes] : []),
     ];
     await navigator.clipboard.writeText(lines.join('\n'));
     alert('Quote copied to clipboard!');
   };
 
-  const Section = ({ title, badge, items, sectionSub }) => (
+  const Section = ({ title, badge, items, sectionSub, isFirst }) => (
     items.length > 0 ? (
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ marginBottom: 24, marginTop: isFirst ? 0 : 8 }}>
+
+        {/* Section header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 9, paddingBottom: 7,
+          borderBottom: '1px solid var(--border)',
+        }}>
           <span className={`badge badge-${badge}`}>{title}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
             {items.length} item{items.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {items.map(item => (
+
+        {/* Item list — grouped card with dividers */}
+        <div style={{
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          background: 'var(--surface)',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
+          {items.map((item, idx) => (
             <div key={item.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 12px',
-              background: 'var(--surface)', borderRadius: 'var(--radius)',
-              border: '1px solid var(--border)',
-              boxShadow: 'var(--shadow-sm)',
+              padding: '11px 14px',
+              borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none',
             }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.845rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
+
+              {/* Row 1 — name + line total */}
+              <div style={{
+                display: 'flex', alignItems: 'baseline',
+                justifyContent: 'space-between', gap: 10, marginBottom: 7,
+              }}>
+                <div style={{
+                  fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)',
+                  flex: 1, minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
                   {item.name}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                  <PriceInput item={item} onPriceChange={onPriceChange} />
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ {item.unit}</span>
-                  {item.category_slug === 'custom' && (
-                    <span style={{ marginLeft: 4, fontSize: '0.72rem', color: 'var(--amber)', fontWeight: 500 }}>custom</span>
-                  )}
+                <div style={{
+                  fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)',
+                  whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                  {fmt(item.unit_price * item.qty)}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+              {/* Row 2 — qty controls · unit price · delete */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+
                 <button className="btn btn-ghost btn-sm"
                   onClick={() => onQtyChange(item.id, Math.max(0.1, +(item.qty - 1).toFixed(2)))}
-                  style={{ padding: '3px 7px', minWidth: 26 }}>−</button>
+                  style={{ padding: '2px 7px', minWidth: 26, height: 26, lineHeight: 1, flexShrink: 0 }}>−</button>
+
                 <input
                   type="number" min="0.01" step="0.01"
                   value={item.qty}
                   onChange={e => onQtyChange(item.id, Math.max(0.01, parseFloat(e.target.value) || 0))}
                   style={{
-                    width: 58, textAlign: 'center', padding: '3px 5px',
+                    width: 54, textAlign: 'center', padding: '2px 4px', height: 26,
                     background: 'var(--bg)', border: '1px solid var(--border)',
                     borderRadius: 'var(--radius)', color: 'var(--text-primary)',
-                    fontSize: '0.82rem', fontFamily: 'var(--font)',
+                    fontSize: '0.82rem', fontFamily: 'var(--font)', flexShrink: 0,
                   }} />
+
                 <button className="btn btn-ghost btn-sm"
                   onClick={() => onQtyChange(item.id, +(item.qty + 1).toFixed(2))}
-                  style={{ padding: '3px 7px', minWidth: 26 }}>+</button>
+                  style={{ padding: '2px 7px', minWidth: 26, height: 26, lineHeight: 1, flexShrink: 0 }}>+</button>
+
+                <span style={{
+                  fontSize: '0.75rem', color: 'var(--text-muted)',
+                  marginLeft: 2, flexShrink: 0,
+                }}>{item.unit}</span>
+
+                <span style={{ fontSize: '0.68rem', color: 'var(--border-dark)', margin: '0 1px', flexShrink: 0 }}>·</span>
+
+                <PriceInput item={item} onPriceChange={onPriceChange} />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>/{item.unit}</span>
+
+                {item.category_slug === 'custom' && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--amber)', fontWeight: 600, flexShrink: 0 }}>custom</span>
+                )}
+
+                <div style={{ flex: 1 }} />
+
+                <button
+                  onClick={() => onRemove(item.id)}
+                  title="Remove item"
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1,
+                    padding: '3px 5px', borderRadius: 'var(--radius)', flexShrink: 0,
+                    transition: 'color 0.12s, background 0.12s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--rust)'; e.currentTarget.style.background = '#FEF2F2'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                >✕</button>
+
               </div>
-              <div style={{ fontWeight: 600, fontSize: '0.875rem', minWidth: 74, textAlign: 'right', color: 'var(--text-primary)' }}>
-                {fmt(item.unit_price * item.qty)}
-              </div>
-              <button className="btn btn-danger btn-sm" onClick={() => onRemove(item.id)}
-                title="Remove item" style={{ padding: '3px 7px' }}>✕</button>
             </div>
           ))}
         </div>
-        <div style={{ textAlign: 'right', marginTop: 7, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+
+        {/* Section subtotal */}
+        <div style={{ textAlign: 'right', marginTop: 7, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           Subtotal: <strong style={{ color: 'var(--text-primary)' }}>{fmt(sectionSub)}</strong>
         </div>
+
       </div>
     ) : null
   );
@@ -300,21 +366,21 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPric
         <div style={{ flex: 1, minWidth: 150 }}>
           <label className="label">Project Name</label>
           <input className="input" placeholder="Smith Residence Addition"
-            value={projectName} onChange={e => setProjectName(e.target.value)} />
+            value={projectName} onChange={e => onProjectNameChange(e.target.value)} />
         </div>
         <div style={{ flex: 1, minWidth: 150 }}>
           <label className="label">Client / Contact</label>
           <input className="input" placeholder="John Smith"
-            value={clientName} onChange={e => setClientName(e.target.value)} />
+            value={clientName} onChange={e => onClientNameChange(e.target.value)} />
         </div>
       </div>
 
       {/* ── Items ── */}
       {hasItems ? (
         <>
-          <Section title="Materials" badge="materials" items={materials} sectionSub={matSub} />
-          <Section title="Labor"     badge="labor"     items={labor}     sectionSub={labSub} />
-          <Section title="Other"     badge="other"     items={other}     sectionSub={othSub} />
+          <Section title="Materials" badge="materials" items={materials} sectionSub={matSub} isFirst={true} />
+          <Section title="Labor"     badge="labor"     items={labor}     sectionSub={labSub} isFirst={!materials.length} />
+          <Section title="Other"     badge="other"     items={other}     sectionSub={othSub} isFirst={!materials.length && !labor.length} />
         </>
       ) : (
         <div style={{
@@ -486,7 +552,7 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPric
               <span style={{ color: 'var(--amber)', fontWeight: 700, fontSize: '1rem' }}>{margin}%</span>
             </div>
             <input type="range" min="0" max="50" step="1" value={margin}
-              onChange={e => setMargin(Number(e.target.value))}
+              onChange={e => onMarginChange(Number(e.target.value))}
               style={{ width: '100%', accentColor: 'var(--charcoal)' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
               <span>0%</span><span>25%</span><span>50%</span>
@@ -525,6 +591,21 @@ export default function QuoteBuilder({ quoteItems, onRemove, onQtyChange, onPric
                 <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Total Estimate</span>
                 <span style={{ fontWeight: 700, fontSize: '1.3rem', color: 'var(--rust)', letterSpacing: '-0.02em' }}>{fmt(total)}</span>
               </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="no-print">
+            <label className="label">Notes / Payment Terms</label>
+            <textarea
+              className="input"
+              placeholder="e.g. This estimate is valid for 30 days. Payment: 50% deposit upon signing, balance on completion."
+              value={notes}
+              onChange={e => onNotesChange(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical', lineHeight: 1.5, minHeight: 72 }}
+            />
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
+              Appears on the PDF export
             </div>
           </div>
 

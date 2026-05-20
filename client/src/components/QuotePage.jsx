@@ -43,19 +43,87 @@ function CategoryIcon({ slug }) {
   }
 }
 
-const fmt = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const fmt      = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const fmtShort = (n) => n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : fmt(n);
+
+// ── Multi-quote helpers ───────────────────────────────────────────────────────
+
+function makeQuote(name = '') {
+  return {
+    id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    clientName: '',
+    items: [],
+    margin: 15,
+    notes: '',
+    estimateNo: null,
+    createdAt: Date.now(),
+  };
+}
+
+function loadInitialQuotes() {
+  // Load new multi-quote format
+  try {
+    const saved = JSON.parse(localStorage.getItem('buildright_quotes'));
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+  } catch {}
+
+  // Migrate from single-quote format (previous app version)
+  try {
+    const oldItems = JSON.parse(localStorage.getItem('buildright_quote'));
+    if (Array.isArray(oldItems) && oldItems.length > 0) {
+      const q = makeQuote(localStorage.getItem('buildright_project') || '');
+      q.clientName  = localStorage.getItem('buildright_client')      || '';
+      q.items       = oldItems;
+      q.margin      = Number(localStorage.getItem('buildright_margin')) || 15;
+      q.notes       = localStorage.getItem('buildright_notes')        || '';
+      q.estimateNo  = localStorage.getItem('buildright_estimate_no')  || null;
+      return [q];
+    }
+  } catch {}
+
+  return [makeQuote()];
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function QuotePage() {
-  const [activeSlug,      setActiveSlug]      = useState('all');
-  const [allItems,        setAllItems]        = useState([]);
-  const [loading,         setLoading]         = useState(true);
-  const [search,          setSearch]          = useState('');
-  const [quoteItems,      setQuoteItems]      = useState(() => {
-    try { return JSON.parse(localStorage.getItem('buildright_quote')) || []; } catch { return []; }
+  const [activeSlug,     setActiveSlug]     = useState('all');
+  const [allItems,       setAllItems]       = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [search,         setSearch]         = useState('');
+  const [windowWidth,    setWindowWidth]    = useState(() => window.innerWidth);
+  const [showQuotePanel, setShowQuotePanel] = useState(false);
+  const [showQuickStart, setShowQuickStart] = useState(false);
+
+  // Multi-quote state
+  const [quotes,        setQuotes]        = useState(loadInitialQuotes);
+  const [activeId,      setActiveId]      = useState(() => {
+    const qs    = loadInitialQuotes();
+    const saved = localStorage.getItem('buildright_active_quote');
+    return qs.find(q => q.id === saved) ? saved : qs[0].id;
   });
-  const [windowWidth,     setWindowWidth]     = useState(() => window.innerWidth);
-  const [showQuotePanel,  setShowQuotePanel]  = useState(false);
-  const [showQuickStart,  setShowQuickStart]  = useState(false);
+  const [showSelector,  setShowSelector]  = useState(false);
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [newQuoteName,  setNewQuoteName]  = useState('');
+
+  // Derived active quote
+  const activeQuote = quotes.find(q => q.id === activeId) ?? quotes[0];
+  const quoteItems  = activeQuote.items;
+  const quoteTotal  = quoteItems.reduce((s, i) => s + i.unit_price * i.qty, 0);
+  const hasItems    = quoteItems.length > 0;
+
+  // ── Persistence ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    localStorage.setItem('buildright_quotes', JSON.stringify(quotes));
+  }, [quotes]);
+
+  useEffect(() => {
+    localStorage.setItem('buildright_active_quote', activeId);
+  }, [activeId]);
+
+  // ── Side effects ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const handler = () => setWindowWidth(window.innerWidth);
@@ -75,46 +143,36 @@ export default function QuotePage() {
   }, [showQuotePanel, showQuickStart]);
 
   useEffect(() => {
-    localStorage.setItem('buildright_quote', JSON.stringify(quoteItems));
-  }, [quoteItems]);
-
-  useEffect(() => {
     fetch('/api/items')
       .then(r => r.json())
       .then(data => { setAllItems(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
-  const visibleItems = allItems.filter(item => {
-    const matchCat    = activeSlug === 'all' || item.category_slug === activeSlug;
-    const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  // ── Quote operations ─────────────────────────────────────────────────────────
 
-  const addToQuote = (item) => {
-    setQuoteItems(prev => {
-      const existing = prev.find(q => q.id === item.id);
-      if (existing) return prev.map(q => q.id === item.id ? { ...q, qty: q.qty + 1 } : q);
-      return [...prev, { ...item, qty: item.qty ?? 1 }];
-    });
+  const updateActiveQuote = (patch) => {
+    setQuotes(prev => prev.map(q => q.id === activeQuote.id ? { ...q, ...patch } : q));
   };
 
-  const removeFromQuote = (id) => setQuoteItems(prev => prev.filter(q => q.id !== id));
+  const addToQuote = (item) => {
+    const existing = quoteItems.find(q => q.id === item.id);
+    const newItems = existing
+      ? quoteItems.map(q => q.id === item.id ? { ...q, qty: q.qty + 1 } : q)
+      : [...quoteItems, { ...item, qty: item.qty ?? 1 }];
+    updateActiveQuote({ items: newItems });
+  };
+
+  const removeFromQuote = (id) =>
+    updateActiveQuote({ items: quoteItems.filter(q => q.id !== id) });
 
   const updateQty = (id, qty) => {
     if (qty <= 0) { removeFromQuote(id); return; }
-    setQuoteItems(prev => prev.map(q => q.id === id ? { ...q, qty } : q));
+    updateActiveQuote({ items: quoteItems.map(q => q.id === id ? { ...q, qty } : q) });
   };
 
-  const updatePrice = (id, price) => {
-    setQuoteItems(prev => prev.map(q => q.id === id ? { ...q, unit_price: price } : q));
-  };
-
-  const clearQuote = () => {
-    if (window.confirm(`Clear all ${quoteItems.length} item${quoteItems.length !== 1 ? 's' : ''} and start a new quote?`)) {
-      setQuoteItems([]);
-    }
-  };
+  const updatePrice = (id, price) =>
+    updateActiveQuote({ items: quoteItems.map(q => q.id === id ? { ...q, unit_price: price } : q) });
 
   const loadTemplate = (templateItems, mode) => {
     const mapped = templateItems.map((item, idx) => ({
@@ -123,13 +181,42 @@ export default function QuotePage() {
       category_slug: item.category_slug ?? 'custom',
       qty: item.qty ?? 1,
     }));
-    setQuoteItems(mode === 'replace' ? mapped : prev => [...prev, ...mapped]);
+    updateActiveQuote({ items: mode === 'replace' ? mapped : [...quoteItems, ...mapped] });
   };
 
-  const inQuote      = (id)   => quoteItems.some(q => q.id === id);
-  const quoteTotal   = quoteItems.reduce((s, i) => s + i.unit_price * i.qty, 0);
-  const hasItems     = quoteItems.length > 0;
+  // ── Multi-quote operations ────────────────────────────────────────────────────
+
+  const createAndSwitch = (name = '') => {
+    const q = makeQuote(name.trim());
+    setQuotes(prev => [...prev, q]);
+    setActiveId(q.id);
+    setShowSelector(false);
+  };
+
+  const switchQuote = (id) => {
+    setActiveId(id);
+    setShowSelector(false);
+  };
+
+  const deleteQuote = (id) => {
+    if (quotes.length <= 1) return; // can't delete the last quote
+    const target = quotes.find(q => q.id === id);
+    if (!window.confirm(`Delete "${target?.name || 'Untitled Quote'}"? This cannot be undone.`)) return;
+    const remaining = quotes.filter(q => q.id !== id);
+    setQuotes(remaining);
+    if (activeQuote.id === id) setActiveId(remaining[remaining.length - 1].id);
+  };
+
+  // ── Misc helpers ──────────────────────────────────────────────────────────────
+
+  const inQuote      = (id) => quoteItems.some(q => q.id === id);
   const showConcCalc = activeSlug === 'concrete' || activeSlug === 'all';
+
+  const visibleItems = allItems.filter(item => {
+    const matchCat    = activeSlug === 'all' || item.category_slug === activeSlug;
+    const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
+    return matchCat && matchSearch;
+  });
 
   const categoryCounts = allItems.reduce((acc, item) => {
     acc[item.category_slug] = (acc[item.category_slug] || 0) + 1;
@@ -138,7 +225,8 @@ export default function QuotePage() {
 
   const isNarrow = windowWidth < 1024;
 
-  // ── Quick Start button — shared style ────────────────────────────────────────
+  // ── Quick Start button (shared) ───────────────────────────────────────────────
+
   const QuickStartBtn = ({ style = {} }) => (
     <button
       onClick={() => setShowQuickStart(true)}
@@ -166,20 +254,151 @@ export default function QuotePage() {
     </button>
   );
 
-  // ── Quote panel (shared between desktop and mobile bottom sheet) ─────────────
+  // ── Quote selector bar ────────────────────────────────────────────────────────
+
+  const quoteLabel = activeQuote.name || 'Untitled Quote';
+
+  const quoteSelectorBar = (
+    <div style={{
+      padding: '9px 14px',
+      background: 'var(--surface-2)',
+      borderBottom: '1px solid var(--border)',
+      flexShrink: 0,
+    }}>
+      {/* Selector trigger row */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button
+          onClick={() => setShowSelector(s => !s)}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: 7,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', padding: '6px 10px',
+            cursor: 'pointer', minWidth: 0, textAlign: 'left',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-dark)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+        >
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+            style={{ flexShrink: 0, color: 'var(--text-muted)', transform: showSelector ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+            <path d="M1 1l4 4 4-4"/>
+          </svg>
+          <span style={{
+            flex: 1, fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {quoteLabel}
+          </span>
+          {quotes.length > 1 && (
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {quotes.length} quotes
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setShowNewDialog(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)', color: 'var(--text-secondary)',
+            fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--charcoal)';
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = 'var(--charcoal)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'var(--surface)';
+            e.currentTarget.style.color = 'var(--text-secondary)';
+            e.currentTarget.style.borderColor = 'var(--border)';
+          }}
+        >
+          + New
+        </button>
+      </div>
+
+      {/* Inline quote list */}
+      {showSelector && (
+        <div style={{
+          marginTop: 8,
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          background: 'var(--surface)',
+          overflow: 'hidden',
+        }}>
+          {quotes.map((q, i) => {
+            const isActive = q.id === activeId;
+            const qTotal   = q.items.reduce((s, item) => s + item.unit_price * item.qty, 0);
+            return (
+              <div
+                key={q.id}
+                onClick={() => switchQuote(q.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 12px',
+                  background: isActive ? '#F0F4FF' : 'transparent',
+                  borderBottom: i < quotes.length - 1 ? '1px solid var(--border)' : 'none',
+                  cursor: 'pointer', transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ width: 14, fontSize: '0.78rem', color: 'var(--rust)', flexShrink: 0, fontWeight: 700 }}>
+                  {isActive ? '✓' : ''}
+                </span>
+                <span style={{
+                  flex: 1, fontSize: '0.83rem',
+                  fontWeight: isActive ? 600 : 400,
+                  color: 'var(--text-primary)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {q.name || 'Untitled Quote'}
+                </span>
+                <span style={{
+                  fontSize: '0.76rem', flexShrink: 0,
+                  color: q.items.length > 0 ? 'var(--text-secondary)' : 'var(--text-muted)',
+                }}>
+                  {q.items.length > 0 ? fmtShort(qTotal) : 'Empty'}
+                </span>
+                {quotes.length > 1 && (
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteQuote(q.id); }}
+                    style={{
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-muted)', padding: '2px 5px',
+                      borderRadius: 4, fontSize: '0.85rem', lineHeight: 1, flexShrink: 0,
+                      transition: 'color 0.12s, background 0.12s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--rust)'; e.currentTarget.style.background = '#FEF2F2'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                    title={`Delete "${q.name || 'Untitled Quote'}"`}
+                  >✕</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Quote panel content (shared desktop + mobile) ─────────────────────────────
+
   const quotePanelContent = (
     <>
+      {quoteSelectorBar}
+
       <div style={{
-        padding: '13px 18px',
+        padding: '11px 18px',
         background: '#fff',
         borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexShrink: 0, gap: 8,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
-            Your Quote
-          </span>
           {hasItems && (
             <span style={{
               background: 'var(--charcoal)', color: '#fff',
@@ -190,21 +409,6 @@ export default function QuotePage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <QuickStartBtn />
-          {hasItems && (
-            <button
-              onClick={clearQuote}
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                fontSize: '0.75rem', color: 'var(--text-muted)',
-                padding: '3px 7px', borderRadius: 'var(--radius)',
-                transition: 'color 0.15s, background 0.15s', whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--rust)'; e.currentTarget.style.background = '#FEF2F2'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
-            >
-              New quote
-            </button>
-          )}
           {hasItems && (
             <span style={{ fontWeight: 700, color: 'var(--rust)', fontSize: '0.92rem', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
               {fmt(quoteTotal)}
@@ -222,6 +426,7 @@ export default function QuotePage() {
           )}
         </div>
       </div>
+
       <div style={{ padding: 18, overflowY: 'auto', flex: 1 }}>
         <QuoteBuilder
           quoteItems={quoteItems}
@@ -229,6 +434,16 @@ export default function QuotePage() {
           onQtyChange={updateQty}
           onPriceChange={updatePrice}
           onAdd={addToQuote}
+          projectName={activeQuote.name}
+          onProjectNameChange={name => updateActiveQuote({ name })}
+          clientName={activeQuote.clientName}
+          onClientNameChange={clientName => updateActiveQuote({ clientName })}
+          margin={activeQuote.margin}
+          onMarginChange={margin => updateActiveQuote({ margin })}
+          notes={activeQuote.notes}
+          onNotesChange={notes => updateActiveQuote({ notes })}
+          estimateNo={activeQuote.estimateNo}
+          onEstimateNoChange={estimateNo => updateActiveQuote({ estimateNo })}
         />
       </div>
     </>
@@ -251,7 +466,7 @@ export default function QuotePage() {
         }}>
           {CATEGORIES.map(cat => {
             const active = activeSlug === cat.slug;
-            const count = cat.slug === 'all' ? allItems.length : (categoryCounts[cat.slug] || 0);
+            const count  = cat.slug === 'all' ? allItems.length : (categoryCounts[cat.slug] || 0);
             return (
               <button key={cat.slug}
                 onClick={() => { setActiveSlug(cat.slug); setSearch(''); }}
@@ -320,7 +535,7 @@ export default function QuotePage() {
               </div>
               {CATEGORIES.map(cat => {
                 const active = activeSlug === cat.slug;
-                const count = cat.slug === 'all' ? allItems.length : (categoryCounts[cat.slug] || 0);
+                const count  = cat.slug === 'all' ? allItems.length : (categoryCounts[cat.slug] || 0);
                 return (
                   <button key={cat.slug}
                     onClick={() => { setActiveSlug(cat.slug); setSearch(''); }}
@@ -362,11 +577,11 @@ export default function QuotePage() {
                 onAddCuYard={(cuYd) => {
                   const concreteItem = allItems.find(i => i.name.includes('3000 PSI'));
                   if (concreteItem) {
-                    setQuoteItems(prev => {
-                      const existing = prev.find(q => q.id === concreteItem.id);
-                      if (existing) return prev.map(q => q.id === concreteItem.id ? { ...q, qty: +(q.qty + cuYd).toFixed(2) } : q);
-                      return [...prev, { ...concreteItem, qty: +cuYd.toFixed(2) }];
-                    });
+                    const existing = quoteItems.find(q => q.id === concreteItem.id);
+                    const newItems = existing
+                      ? quoteItems.map(q => q.id === concreteItem.id ? { ...q, qty: +(q.qty + cuYd).toFixed(2) } : q)
+                      : [...quoteItems, { ...concreteItem, qty: +cuYd.toFixed(2) }];
+                    updateActiveQuote({ items: newItems });
                   }
                 }}
               />
@@ -421,7 +636,7 @@ export default function QuotePage() {
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-              Your Quote
+              {quoteLabel.length > 18 ? quoteLabel.slice(0, 18) + '…' : quoteLabel}
               {hasItems && (
                 <span style={{ background: 'var(--rust)', color: '#fff', borderRadius: 999, padding: '1px 7px', fontSize: '0.7rem', fontWeight: 700 }}>
                   {quoteItems.length}
@@ -493,20 +708,68 @@ export default function QuotePage() {
         hasExistingItems={hasItems}
         onLoadTemplate={loadTemplate}
       />
+
+      {/* ── New Quote dialog ── */}
+      {showNewDialog && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 600, padding: 24,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) { setNewQuoteName(''); setShowNewDialog(false); } }}
+        >
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)', padding: 28,
+            width: '100%', maxWidth: 380,
+            boxShadow: 'var(--shadow-md)',
+          }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.015em', marginBottom: 5 }}>
+              New Quote
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.5 }}>
+              Give it a project name to get started, or skip and name it later.
+            </p>
+            <label className="label">Project Name</label>
+            <input
+              className="input"
+              placeholder="e.g. Smith Residence Addition"
+              value={newQuoteName}
+              onChange={e => setNewQuoteName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter')  { createAndSwitch(newQuoteName); setNewQuoteName(''); setShowNewDialog(false); }
+                if (e.key === 'Escape') { setNewQuoteName(''); setShowNewDialog(false); }
+              }}
+              autoFocus
+              style={{ marginBottom: 20 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-ghost"
+                style={{ flex: 1 }}
+                onClick={() => { createAndSwitch(''); setNewQuoteName(''); setShowNewDialog(false); }}
+              >
+                Skip
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 2 }}
+                onClick={() => { createAndSwitch(newQuoteName); setNewQuoteName(''); setShowNewDialog(false); }}
+              >
+                Create Quote →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-function fmtPriceDate(dateStr) {
-  if (!dateStr) return null;
-  const [year, month] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
 function ItemCard({ item, added, onAdd }) {
   const badgeClass = `badge badge-${item.item_type}`;
   const typeLabel  = item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1);
-  const priceDate  = fmtPriceDate(item.price_updated_at);
 
   return (
     <div style={{
@@ -537,11 +800,6 @@ function ItemCard({ item, added, onAdd }) {
           {added ? '✓ Added' : '+ Add'}
         </button>
       </div>
-      {priceDate && (
-        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: 7, marginTop: -2 }}>
-          Updated: {priceDate}
-        </div>
-      )}
     </div>
   );
 }
