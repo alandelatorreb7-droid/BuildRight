@@ -138,15 +138,17 @@ export function generatePDF({
 
     // Item rows
     items.forEach(item => {
-      const nameText = item.description
-        ? `${item.name}\n${item.description}`
-        : item.name;
-      const qtyText = (+item.qty % 1 === 0)
+      const hasNote  = item.note && item.note.trim();
+      const baseName = item.description ? `${item.name}\n${item.description}` : item.name;
+      const nameCell = hasNote
+        ? { content: `${baseName}\n${item.note.trim()}`, _note: item.note.trim() }
+        : { content: baseName };
+      const qtyText  = (+item.qty % 1 === 0)
         ? String(item.qty)
         : (+item.qty).toFixed(2);
 
       body.push([
-        { content: nameText },
+        nameCell,
         { content: item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1), styles: { halign: 'center', textColor: MUT } },
         { content: qtyText,              styles: { halign: 'center' } },
         { content: item.unit,            styles: { halign: 'center', textColor: MUT } },
@@ -167,6 +169,8 @@ export function generatePDF({
   pushSection('Labor',     labor,     labSub);
   pushSection('Other',     other,     othSub);
 
+  // Column widths (mm). Fixed cols total = 106 mm; Description fills the rest (~78 mm, ~42%).
+  // Padding is 4 mm per side (8 mm total) so narrow cols have room for text without wrapping.
   autoTable(doc, {
     startY: y,
     margin: { left: ML, right: MR },
@@ -181,26 +185,51 @@ export function generatePDF({
     body,
     styles: {
       font: 'helvetica',
-      fontSize: 8.5,
-      cellPadding: { top: 3, bottom: 3, left: 6, right: 6 },
+      fontSize: 8,
+      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
       textColor: TXT,
+      overflow: 'linebreak',
     },
     headStyles: {
-      fillColor: TH, textColor: WHT, fontStyle: 'bold', fontSize: 8,
-      cellPadding: { top: 4, bottom: 4, left: 6, right: 6 },
+      fillColor: TH, textColor: WHT, fontStyle: 'bold', fontSize: 7.5,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
     },
     columnStyles: {
-      0: { cellWidth: 'auto'           }, // Description — fills remaining space
-      1: { cellWidth: 20, halign: 'center' },
-      2: { cellWidth: 14, halign: 'center' },
-      3: { cellWidth: 14, halign: 'center' },
-      4: { cellWidth: 26, halign: 'right'  },
-      5: { cellWidth: 28, halign: 'right'  },
+      0: { cellWidth: 'auto', overflow: 'linebreak'  },   // Description — wraps intentionally
+      1: { cellWidth: 22, halign: 'center', overflow: 'ellipsize' }, // Type  (~12%)
+      2: { cellWidth: 15, halign: 'center', overflow: 'ellipsize' }, // Qty   (~8%)
+      3: { cellWidth: 17, halign: 'center', overflow: 'ellipsize' }, // Unit  (~9%)
+      4: { cellWidth: 26, halign: 'right',  overflow: 'ellipsize' }, // Unit Price (~14%)
+      5: { cellWidth: 26, halign: 'right',  overflow: 'ellipsize' }, // Amount (~14%)
     },
     alternateRowStyles: { fillColor: STR },
     tableLineColor: BDR,
     tableLineWidth: 0.2,
     showHead: 'firstPage',
+    willDrawCell: (data) => {
+      if (data.section !== 'body' || data.column.index !== 0) return;
+      if (!data.cell.raw?._note) return;
+      data.cell.text = []; // suppress autotable's default rendering so we draw manually
+    },
+    didDrawCell: (data) => {
+      if (data.section !== 'body' || data.column.index !== 0) return;
+      if (!data.cell.raw?._note) return;
+      const { x, y } = data.cell;
+      const padL = 4, padT = 3;
+      const maxW = data.cell.width - padL * 2;
+      const nameText = data.cell.raw.content.split('\n')[0];
+      const note = data.cell.raw._note;
+      // Item name — normal weight
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...TXT);
+      doc.text(nameText, x + padL, y + padT + 2.3, { maxWidth: maxW });
+      // Note — italic muted, slightly indented
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(...MUT);
+      doc.text(note, x + padL + 2, y + padT + 2.3 + 4.2, { maxWidth: maxW - 2 });
+    },
   });
 
   y = doc.lastAutoTable.finalY + 10;

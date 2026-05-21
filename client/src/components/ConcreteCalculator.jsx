@@ -24,10 +24,14 @@ function calcCuYd(shape, dims) {
   return cubicFt / 27;
 }
 
-export default function ConcreteCalculator({ onAddCuYard }) {
+export default function ConcreteCalculator({ onAddCuYard, concreteItems = [] }) {
   const [shape, setShape] = useState('rect');
   const [dims, setDims] = useState({});
   const [wastePct, setWastePct] = useState(10);
+  const [addError, setAddError] = useState(null);
+  const [selectedItemId, setSelectedItemId] = useState(null);
+
+  const effectiveItemId = selectedItemId ?? concreteItems[0]?.id ?? null;
 
   const cuYd = calcCuYd(shape, dims);
   const cuYdWithWaste = cuYd * (1 + wastePct / 100);
@@ -134,10 +138,30 @@ export default function ConcreteCalculator({ onAddCuYard }) {
               </div>
             </div>
             {onAddCuYard && (
-              <button className="btn btn-primary"
-                onClick={() => onAddCuYard(cuYdWithWaste)}>
-                Use This Volume
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                {concreteItems.length > 0 && (
+                  <select
+                    className="select"
+                    value={effectiveItemId ?? ''}
+                    onChange={e => setSelectedItemId(e.target.value)}
+                  >
+                    {concreteItems.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} — ${item.unit_price}/cu yd
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button className="btn btn-primary"
+                  onClick={() => setAddError(onAddCuYard(cuYdWithWaste, effectiveItemId) ?? null)}>
+                  Use This Volume
+                </button>
+                {addError && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--rust)' }}>
+                    {addError}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Header from './Header';
 import ConcreteCalculator from './ConcreteCalculator';
 import QuoteBuilder from './QuoteBuilder';
@@ -106,6 +107,10 @@ export default function QuotePage() {
   const [showSelector,  setShowSelector]  = useState(false);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newQuoteName,  setNewQuoteName]  = useState('');
+  const [menu,          setMenu]          = useState(null); // { id, rect } | null
+  const [renamingId,    setRenamingId]    = useState(null);
+  const [renameVal,     setRenameVal]     = useState('');
+  const [toast,         setToast]         = useState(null);
 
   // Derived active quote
   const activeQuote = quotes.find(q => q.id === activeId) ?? quotes[0];
@@ -174,6 +179,9 @@ export default function QuotePage() {
   const updatePrice = (id, price) =>
     updateActiveQuote({ items: quoteItems.map(q => q.id === id ? { ...q, unit_price: price } : q) });
 
+  const updateNote = (id, note) =>
+    updateActiveQuote({ items: quoteItems.map(q => q.id === id ? { ...q, note } : q) });
+
   const loadTemplate = (templateItems, mode) => {
     const mapped = templateItems.map((item, idx) => ({
       ...item,
@@ -206,6 +214,43 @@ export default function QuotePage() {
     setQuotes(remaining);
     if (activeQuote.id === id) setActiveId(remaining[remaining.length - 1].id);
   };
+
+  const cloneQuote = (id) => {
+    const src = quotes.find(q => q.id === id);
+    if (!src) return;
+    const clone = {
+      ...src,
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: `Copy of ${src.name || 'Untitled Quote'}`,
+      items: src.items.map(item => ({ ...item })),
+      createdAt: Date.now(),
+      estimateNo: null,
+    };
+    setQuotes(qs => [...qs, clone]);
+    setActiveId(clone.id);
+    setShowSelector(false);
+    setMenu(null);
+    const tid = Date.now();
+    setToast({ msg: 'Quote cloned successfully', id: tid });
+    setTimeout(() => setToast(t => t?.id === tid ? null : t), 2500);
+  };
+
+  const renameQuote = (id, name) => {
+    setQuotes(qs => qs.map(q => q.id === id ? { ...q, name: name.trim() } : q));
+    setRenamingId(null);
+  };
+
+  // Close the ⋯ portal menu on any scroll or window resize
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [menu]);
 
   // ── Misc helpers ──────────────────────────────────────────────────────────────
 
@@ -259,130 +304,163 @@ export default function QuotePage() {
   const quoteLabel = activeQuote.name || 'Untitled Quote';
 
   const quoteSelectorBar = (
-    <div style={{
-      padding: '9px 14px',
-      background: 'var(--surface-2)',
-      borderBottom: '1px solid var(--border)',
-      flexShrink: 0,
-    }}>
-      {/* Selector trigger row */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button
-          onClick={() => setShowSelector(s => !s)}
-          style={{
-            flex: 1, display: 'flex', alignItems: 'center', gap: 7,
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)', padding: '6px 10px',
-            cursor: 'pointer', minWidth: 0, textAlign: 'left',
-            transition: 'border-color 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-dark)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-        >
-          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
-            style={{ flexShrink: 0, color: 'var(--text-muted)', transform: showSelector ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-            <path d="M1 1l4 4 4-4"/>
-          </svg>
-          <span style={{
-            flex: 1, fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {quoteLabel}
-          </span>
-          {quotes.length > 1 && (
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-              {quotes.length} quotes
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setShowNewDialog(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '6px 12px', borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)',
-            background: 'var(--surface)', color: 'var(--text-secondary)',
-            fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'var(--charcoal)';
-            e.currentTarget.style.color = '#fff';
-            e.currentTarget.style.borderColor = 'var(--charcoal)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'var(--surface)';
-            e.currentTarget.style.color = 'var(--text-secondary)';
-            e.currentTarget.style.borderColor = 'var(--border)';
-          }}
-        >
-          + New
-        </button>
-      </div>
+    <>
 
-      {/* Inline quote list */}
-      {showSelector && (
-        <div style={{
-          marginTop: 8,
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          background: 'var(--surface)',
-          overflow: 'hidden',
-        }}>
-          {quotes.map((q, i) => {
-            const isActive = q.id === activeId;
-            const qTotal   = q.items.reduce((s, item) => s + item.unit_price * item.qty, 0);
-            return (
-              <div
-                key={q.id}
-                onClick={() => switchQuote(q.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 12px',
-                  background: isActive ? '#F0F4FF' : 'transparent',
-                  borderBottom: i < quotes.length - 1 ? '1px solid var(--border)' : 'none',
-                  cursor: 'pointer', transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface-2)'; }}
-                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <span style={{ width: 14, fontSize: '0.78rem', color: 'var(--rust)', flexShrink: 0, fontWeight: 700 }}>
-                  {isActive ? '✓' : ''}
-                </span>
-                <span style={{
-                  flex: 1, fontSize: '0.83rem',
-                  fontWeight: isActive ? 600 : 400,
-                  color: 'var(--text-primary)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {q.name || 'Untitled Quote'}
-                </span>
-                <span style={{
-                  fontSize: '0.76rem', flexShrink: 0,
-                  color: q.items.length > 0 ? 'var(--text-secondary)' : 'var(--text-muted)',
-                }}>
-                  {q.items.length > 0 ? fmtShort(qTotal) : 'Empty'}
-                </span>
-                {quotes.length > 1 && (
+      <div style={{
+        padding: '9px 14px',
+        background: 'var(--surface-2)',
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0,
+      }}>
+        {/* Selector trigger row */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowSelector(s => !s)}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', gap: 7,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)', padding: '6px 10px',
+              cursor: 'pointer', minWidth: 0, textAlign: 'left',
+              transition: 'border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-dark)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+              style={{ flexShrink: 0, color: 'var(--text-muted)', transform: showSelector ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+            <span style={{
+              flex: 1, fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {quoteLabel}
+            </span>
+            {quotes.length > 1 && (
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {quotes.length} quotes
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setShowNewDialog(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)', color: 'var(--text-secondary)',
+              fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'var(--charcoal)';
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.borderColor = 'var(--charcoal)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'var(--surface)';
+              e.currentTarget.style.color = 'var(--text-secondary)';
+              e.currentTarget.style.borderColor = 'var(--border)';
+            }}
+          >
+            + New
+          </button>
+        </div>
+
+        {/* Inline quote list */}
+        {showSelector && (
+          <div style={{
+            marginTop: 8,
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface)',
+            overflow: 'hidden',
+          }}>
+            {quotes.map((q, i) => {
+              const isActive = q.id === activeId;
+              const qTotal   = q.items.reduce((s, item) => s + item.unit_price * item.qty, 0);
+              return (
+                <div
+                  key={q.id}
+                  onClick={() => { if (renamingId !== q.id) switchQuote(q.id); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 12px',
+                    background: isActive ? '#F0F4FF' : 'transparent',
+                    borderBottom: i < quotes.length - 1 ? '1px solid var(--border)' : 'none',
+                    cursor: renamingId === q.id ? 'default' : 'pointer',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => { if (!isActive && renamingId !== q.id) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? '#F0F4FF' : 'transparent'; }}
+                >
+                  <span style={{ width: 14, fontSize: '0.78rem', color: 'var(--rust)', flexShrink: 0, fontWeight: 700 }}>
+                    {isActive ? '✓' : ''}
+                  </span>
+
+                  {renamingId === q.id ? (
+                    <input
+                      autoFocus
+                      className="input"
+                      value={renameVal}
+                      onChange={e => setRenameVal(e.target.value)}
+                      onBlur={() => renameQuote(q.id, renameVal)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter')  e.target.blur();
+                        if (e.key === 'Escape') setRenamingId(null);
+                      }}
+                      onClick={e => e.stopPropagation()}
+                      style={{ flex: 1, fontSize: '0.83rem', padding: '2px 6px', height: 26, minWidth: 0 }}
+                    />
+                  ) : (
+                    <span style={{
+                      flex: 1, fontSize: '0.83rem',
+                      fontWeight: isActive ? 600 : 400,
+                      color: 'var(--text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {q.name || 'Untitled Quote'}
+                    </span>
+                  )}
+
+                  {renamingId !== q.id && (
+                    <span style={{
+                      fontSize: '0.76rem', flexShrink: 0,
+                      color: q.items.length > 0 ? 'var(--text-secondary)' : 'var(--text-muted)',
+                    }}>
+                      {q.items.length > 0 ? fmtShort(qTotal) : 'Empty'}
+                    </span>
+                  )}
+
+                  {/* ⋯ options button — dropdown rendered via portal to avoid overflow clipping */}
                   <button
-                    onClick={e => { e.stopPropagation(); deleteQuote(q.id); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (menu?.id === q.id) { setMenu(null); return; }
+                      setMenu({ id: q.id, rect: e.currentTarget.getBoundingClientRect() });
+                    }}
+                    title="Quote options"
                     style={{
                       background: 'transparent', border: 'none', cursor: 'pointer',
-                      color: 'var(--text-muted)', padding: '2px 5px',
-                      borderRadius: 4, fontSize: '0.85rem', lineHeight: 1, flexShrink: 0,
+                      color: menu?.id === q.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                      padding: '1px 6px', borderRadius: 4,
+                      fontSize: '1.1rem', lineHeight: 1, letterSpacing: '0.05em',
+                      flexShrink: 0,
                       transition: 'color 0.12s, background 0.12s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--rust)'; e.currentTarget.style.background = '#FEF2F2'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
-                    title={`Delete "${q.name || 'Untitled Quote'}"`}
-                  >✕</button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.color = menu?.id === q.id ? 'var(--text-primary)' : 'var(--text-muted)';
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                  >⋯</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 
   // ── Quote panel content (shared desktop + mobile) ─────────────────────────────
@@ -433,6 +511,7 @@ export default function QuotePage() {
           onRemove={removeFromQuote}
           onQtyChange={updateQty}
           onPriceChange={updatePrice}
+          onNoteChange={updateNote}
           onAdd={addToQuote}
           projectName={activeQuote.name}
           onProjectNameChange={name => updateActiveQuote({ name })}
@@ -572,20 +651,21 @@ export default function QuotePage() {
                 style={{ background: '#fff' }} />
             </div>
 
-            {showConcCalc && (
+            <div style={{ display: showConcCalc ? 'block' : 'none' }}>
               <ConcreteCalculator
-                onAddCuYard={(cuYd) => {
-                  const concreteItem = allItems.find(i => i.name.includes('3000 PSI'));
-                  if (concreteItem) {
-                    const existing = quoteItems.find(q => q.id === concreteItem.id);
-                    const newItems = existing
-                      ? quoteItems.map(q => q.id === concreteItem.id ? { ...q, qty: +(q.qty + cuYd).toFixed(2) } : q)
-                      : [...quoteItems, { ...concreteItem, qty: +cuYd.toFixed(2) }];
-                    updateActiveQuote({ items: newItems });
-                  }
+                concreteItems={allItems.filter(i => i.category_slug === 'concrete' && i.unit === 'cu yd')}
+                onAddCuYard={(cuYd, itemId) => {
+                  const item = allItems.find(i => i.id === itemId);
+                  if (!item) return 'Selected concrete item not found in price list.';
+                  const existing = quoteItems.find(q => q.id === item.id);
+                  const newItems = existing
+                    ? quoteItems.map(q => q.id === item.id ? { ...q, qty: +(q.qty + cuYd).toFixed(2) } : q)
+                    : [...quoteItems, { ...item, qty: +cuYd.toFixed(2) }];
+                  updateActiveQuote({ items: newItems });
+                  return null;
                 }}
               />
-            )}
+            </div>
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: 64, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading prices…</div>
@@ -761,6 +841,73 @@ export default function QuotePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── ⋯ Quote options portal (renders outside scroll containers to avoid clipping) ── */}
+      {menu && (() => {
+        const menuQuote = quotes.find(q => q.id === menu.id);
+        if (!menuQuote) return null;
+        const MENU_H = 40 * (2 + (quotes.length > 1 ? 1 : 0)); // 40px per option row
+        const spaceBelow = window.innerHeight - menu.rect.bottom;
+        const openAbove  = spaceBelow < MENU_H + 12;
+        const opts = [
+          { label: 'Rename', action: () => { setRenamingId(menuQuote.id); setRenameVal(menuQuote.name || ''); setMenu(null); } },
+          { label: 'Clone',  action: () => cloneQuote(menuQuote.id) },
+          ...(quotes.length > 1 ? [{ label: 'Delete', action: () => { deleteQuote(menuQuote.id); setMenu(null); }, destructive: true }] : []),
+        ];
+        return createPortal(
+          <>
+            <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
+            <div style={{
+              position: 'fixed',
+              right: window.innerWidth - menu.rect.right,
+              ...(openAbove
+                ? { bottom: window.innerHeight - menu.rect.top + 4 }
+                : { top: menu.rect.bottom + 4 }),
+              zIndex: 1000,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+              minWidth: 130, overflow: 'hidden',
+            }}>
+              {opts.map(opt => (
+                <button
+                  key={opt.label}
+                  onClick={opt.action}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '9px 14px', background: 'transparent',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: '0.82rem', fontWeight: 500,
+                    color: opt.destructive ? 'var(--rust)' : 'var(--text-primary)',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = opt.destructive ? '#FEF2F2' : 'var(--surface-2)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body
+        );
+      })()}
+
+      {/* ── Toast notification ── */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: isNarrow ? 80 : 24,
+          left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--charcoal)', color: '#fff',
+          padding: '9px 20px', borderRadius: 999,
+          fontSize: '0.83rem', fontWeight: 500,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.22)',
+          zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          ✓ {toast.msg}
         </div>
       )}
     </div>

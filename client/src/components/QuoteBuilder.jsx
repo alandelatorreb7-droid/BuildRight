@@ -76,7 +76,7 @@ function PriceInput({ item, onPriceChange }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function QuoteBuilder({
-  quoteItems, onRemove, onQtyChange, onPriceChange, onAdd,
+  quoteItems, onRemove, onQtyChange, onPriceChange, onNoteChange, onAdd,
   projectName, onProjectNameChange,
   clientName,  onClientNameChange,
   margin,      onMarginChange,
@@ -97,6 +97,12 @@ export default function QuoteBuilder({
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [custom,         setCustom]         = useState(EMPTY_CUSTOM);
   const [customError,    setCustomError]    = useState('');
+
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [pendingNote,   setPendingNote]   = useState('');
+
+  const startEditNote = (item) => { setEditingNoteId(item.id); setPendingNote(item.note || ''); };
+  const commitNote    = (id)   => { onNoteChange(id, pendingNote.trim()); setEditingNoteId(null); };
 
   const updateCustom = (key, val) => {
     setCustom(c => ({ ...c, [key]: val }));
@@ -221,10 +227,11 @@ export default function QuoteBuilder({
               borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none',
             }}>
 
-              {/* Row 1 — name + line total */}
+              {/* Row 1 — name + line total + pencil */}
               <div style={{
-                display: 'flex', alignItems: 'baseline',
-                justifyContent: 'space-between', gap: 10, marginBottom: 7,
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', gap: 8,
+                marginBottom: (item.note || editingNoteId === item.id) ? 5 : 7,
               }}>
                 <div style={{
                   fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)',
@@ -239,13 +246,54 @@ export default function QuoteBuilder({
                 }}>
                   {fmt(item.unit_price * item.qty)}
                 </div>
+                <button
+                  onClick={() => startEditNote(item)}
+                  title={item.note ? 'Edit note' : 'Add note'}
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    padding: '2px 3px', borderRadius: 3, lineHeight: 1, flexShrink: 0,
+                    color: item.note ? 'var(--amber)' : 'var(--text-muted)',
+                    fontSize: '0.65rem',
+                    opacity: item.note ? 1 : 0.35,
+                    transition: 'opacity 0.12s, color 0.12s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = item.note ? '1' : '0.35'; }}
+                >✏</button>
               </div>
+
+              {/* Note — inline edit or italic display */}
+              {editingNoteId === item.id ? (
+                <input
+                  autoFocus
+                  className="input"
+                  placeholder="Add a note… (e.g. price confirmed with supplier 5/19)"
+                  value={pendingNote}
+                  onChange={e => setPendingNote(e.target.value)}
+                  onBlur={() => commitNote(item.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter')  e.target.blur();
+                    if (e.key === 'Escape') setEditingNoteId(null);
+                  }}
+                  style={{ fontSize: '0.78rem', padding: '4px 8px', marginBottom: 7, height: 'auto' }}
+                />
+              ) : item.note ? (
+                <div
+                  onClick={() => startEditNote(item)}
+                  style={{
+                    fontSize: '0.73rem', color: 'var(--text-muted)', fontStyle: 'italic',
+                    marginBottom: 7, paddingLeft: 1, cursor: 'text', lineHeight: 1.4,
+                  }}
+                >
+                  {item.note}
+                </div>
+              ) : null}
 
               {/* Row 2 — qty controls · unit price · delete */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
 
                 <button className="btn btn-ghost btn-sm"
-                  onClick={() => onQtyChange(item.id, Math.max(0.1, +(item.qty - 1).toFixed(2)))}
+                  onClick={() => onQtyChange(item.id, +(item.qty - 1).toFixed(2))}
                   style={{ padding: '2px 7px', minWidth: 26, height: 26, lineHeight: 1, flexShrink: 0 }}>−</button>
 
                 <input
