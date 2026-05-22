@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Header from './Header';
 import ConcreteCalculator from './ConcreteCalculator';
+import { trackEvent } from '../analytics';
 import QuoteBuilder from './QuoteBuilder';
 import { QuickStartModal } from './ProjectTemplates';
 
@@ -49,41 +50,67 @@ const fmtShort = (n) => n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : fmt(n);
 
 // ── Multi-quote helpers ───────────────────────────────────────────────────────
 
+function defaultValidUntil() {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function generateEstimateNo() {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = String(now.getMonth() + 1).padStart(2, '0');
+  const d   = String(now.getDate()).padStart(2, '0');
+  const seq = String(Math.floor(Math.random() * 9000) + 1000);
+  return `EST-${y}${m}${d}-${seq}`;
+}
+
 function makeQuote(name = '') {
   return {
     id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     name,
     clientName: '',
+    projectAddress: '',
     items: [],
     margin: 15,
     notes: '',
-    estimateNo: null,
+    estimateNo: generateEstimateNo(),
+    validUntil: defaultValidUntil(),
     createdAt: Date.now(),
   };
 }
 
 function loadInitialQuotes() {
+  let quotes = null;
+
   // Load new multi-quote format
   try {
     const saved = JSON.parse(localStorage.getItem('buildright_quotes'));
-    if (Array.isArray(saved) && saved.length > 0) return saved;
+    if (Array.isArray(saved) && saved.length > 0) quotes = saved;
   } catch {}
 
   // Migrate from single-quote format (previous app version)
-  try {
-    const oldItems = JSON.parse(localStorage.getItem('buildright_quote'));
-    if (Array.isArray(oldItems) && oldItems.length > 0) {
-      const q = makeQuote(localStorage.getItem('buildright_project') || '');
-      q.clientName  = localStorage.getItem('buildright_client')      || '';
-      q.items       = oldItems;
-      q.margin      = Number(localStorage.getItem('buildright_margin')) || 15;
-      q.notes       = localStorage.getItem('buildright_notes')        || '';
-      q.estimateNo  = localStorage.getItem('buildright_estimate_no')  || null;
-      return [q];
-    }
-  } catch {}
+  if (!quotes) {
+    try {
+      const oldItems = JSON.parse(localStorage.getItem('buildright_quote'));
+      if (Array.isArray(oldItems) && oldItems.length > 0) {
+        const q = makeQuote(localStorage.getItem('buildright_project') || '');
+        q.clientName  = localStorage.getItem('buildright_client')      || '';
+        q.items       = oldItems;
+        q.margin      = Number(localStorage.getItem('buildright_margin')) || 15;
+        q.notes       = localStorage.getItem('buildright_notes')        || '';
+        // Preserve an existing estimate number from the old format if present
+        const oldNo = localStorage.getItem('buildright_estimate_no');
+        if (oldNo) q.estimateNo = oldNo;
+        quotes = [q];
+      }
+    } catch {}
+  }
 
-  return [makeQuote()];
+  if (!quotes) quotes = [makeQuote()];
+
+  // Backfill: any quote saved before this fix had estimateNo: null — assign one now
+  return quotes.map(q => q.estimateNo ? q : { ...q, estimateNo: generateEstimateNo() });
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -92,6 +119,7 @@ export default function QuotePage() {
   const [activeSlug,     setActiveSlug]     = useState('all');
   const [allItems,       setAllItems]       = useState([]);
   const [loading,        setLoading]        = useState(true);
+  const [loadError,      setLoadError]      = useState(false);
   const [search,         setSearch]         = useState('');
   const [windowWidth,    setWindowWidth]    = useState(() => window.innerWidth);
   const [showQuotePanel, setShowQuotePanel] = useState(false);
@@ -149,9 +177,9 @@ export default function QuotePage() {
 
   useEffect(() => {
     fetch('/api/items')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => { setAllItems(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
   // ── Quote operations ─────────────────────────────────────────────────────────
@@ -189,6 +217,7 @@ export default function QuotePage() {
       category_slug: item.category_slug ?? 'custom',
       qty: item.qty ?? 1,
     }));
+    trackEvent('template_loaded', { item_count: mapped.length, mode });
     updateActiveQuote({ items: mode === 'replace' ? mapped : [...quoteItems, ...mapped] });
   };
 
@@ -224,8 +253,9 @@ export default function QuotePage() {
       name: `Copy of ${src.name || 'Untitled Quote'}`,
       items: src.items.map(item => ({ ...item })),
       createdAt: Date.now(),
-      estimateNo: null,
+      estimateNo: generateEstimateNo(),
     };
+    trackEvent('quote_cloned');
     setQuotes(qs => [...qs, clone]);
     setActiveId(clone.id);
     setShowSelector(false);
@@ -517,12 +547,15 @@ export default function QuotePage() {
           onProjectNameChange={name => updateActiveQuote({ name })}
           clientName={activeQuote.clientName}
           onClientNameChange={clientName => updateActiveQuote({ clientName })}
+          projectAddress={activeQuote.projectAddress || ''}
+          onProjectAddressChange={projectAddress => updateActiveQuote({ projectAddress })}
           margin={activeQuote.margin}
           onMarginChange={margin => updateActiveQuote({ margin })}
           notes={activeQuote.notes}
           onNotesChange={notes => updateActiveQuote({ notes })}
           estimateNo={activeQuote.estimateNo}
-          onEstimateNoChange={estimateNo => updateActiveQuote({ estimateNo })}
+          validUntil={activeQuote.validUntil || defaultValidUntil()}
+          onValidUntilChange={validUntil => updateActiveQuote({ validUntil })}
         />
       </div>
     </>
@@ -548,7 +581,7 @@ export default function QuotePage() {
             const count  = cat.slug === 'all' ? allItems.length : (categoryCounts[cat.slug] || 0);
             return (
               <button key={cat.slug}
-                onClick={() => { setActiveSlug(cat.slug); setSearch(''); }}
+                onClick={() => { trackEvent('category_switched', { category: cat.slug }); setActiveSlug(cat.slug); setSearch(''); }}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   padding: '5px 11px', borderRadius: 999,
@@ -617,7 +650,7 @@ export default function QuotePage() {
                 const count  = cat.slug === 'all' ? allItems.length : (categoryCounts[cat.slug] || 0);
                 return (
                   <button key={cat.slug}
-                    onClick={() => { setActiveSlug(cat.slug); setSearch(''); }}
+                    onClick={() => { trackEvent('category_switched', { category: cat.slug }); setActiveSlug(cat.slug); setSearch(''); }}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 9,
                       padding: '8px 10px', borderRadius: 'var(--radius)', border: 'none',
@@ -669,6 +702,11 @@ export default function QuotePage() {
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: 64, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading prices…</div>
+            ) : loadError ? (
+              <div style={{ textAlign: 'center', padding: 64 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--rust)', marginBottom: 6 }}>Unable to load catalog</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Check that the server is running, then refresh the page.</div>
+              </div>
             ) : visibleItems.length === 0 ? (
               search || activeSlug !== 'all'
                 ? <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', fontSize: '0.9rem' }}>No items found.</div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { trackEvent } from '../analytics';
 
 const fmt = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
@@ -10,6 +11,45 @@ const TYPES = [
 ];
 
 const EMPTY_CUSTOM = { name: '', qty: '1', unit: 'ea', price: '', type: 'other' };
+
+// ── Qty input — local state so typing never triggers a parent re-render ───────
+
+function QtyInput({ itemId, qty, onQtyChange }) {
+  const fmt = (q) => (+q % 1 === 0) ? String(+q) : (+q).toFixed(2);
+  const [raw, setRaw] = useState(() => fmt(qty));
+
+  // Sync when the parent changes qty externally (e.g. the ± buttons)
+  useEffect(() => { setRaw(fmt(qty)); }, [qty]);
+
+  const commit = () => {
+    const n = parseFloat(raw);
+    if (n > 0 && n !== +qty) {
+      onQtyChange(itemId, n);
+    } else if (!(n > 0)) {
+      setRaw(fmt(qty)); // reset invalid input
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={raw}
+      onChange={e => setRaw(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter')  e.target.blur();
+        if (e.key === 'Escape') { setRaw(fmt(qty)); e.target.blur(); }
+      }}
+      style={{
+        width: 54, textAlign: 'center', padding: '2px 4px', height: 26,
+        background: 'var(--bg)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)', color: 'var(--text-primary)',
+        fontSize: '0.82rem', fontFamily: 'var(--font)', flexShrink: 0,
+      }}
+    />
+  );
+}
 
 // ── Inline-editable unit price ────────────────────────────────────────────────
 
@@ -77,11 +117,13 @@ function PriceInput({ item, onPriceChange }) {
 
 export default function QuoteBuilder({
   quoteItems, onRemove, onQtyChange, onPriceChange, onNoteChange, onAdd,
-  projectName, onProjectNameChange,
-  clientName,  onClientNameChange,
-  margin,      onMarginChange,
-  notes,       onNotesChange,
-  estimateNo,  onEstimateNoChange,
+  projectName,    onProjectNameChange,
+  clientName,     onClientNameChange,
+  projectAddress, onProjectAddressChange,
+  margin,         onMarginChange,
+  notes,          onNotesChange,
+  estimateNo,
+  validUntil,     onValidUntilChange,
 }) {
   const [contractor, setContractor] = useState(() => {
     try { return JSON.parse(localStorage.getItem('buildright_contractor') || '{}'); }
@@ -126,6 +168,7 @@ export default function QuoteBuilder({
       qty,
     });
 
+    trackEvent('custom_item_added');
     setCustom(c => ({ ...c, name: '', qty: '1', price: '' }));
     setCustomError('');
   };
@@ -147,17 +190,10 @@ export default function QuoteBuilder({
   const hasItems = quoteItems.length > 0;
 
   const handleDownloadPDF = async () => {
+    trackEvent('pdf_download');
     const { generatePDF } = await import('../utils/generatePDF');
-
-    let usedEstimateNo = estimateNo;
-    if (!usedEstimateNo) {
-      const now = new Date();
-      usedEstimateNo = `EST-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-      onEstimateNoChange(usedEstimateNo);
-    }
-
     generatePDF({
-      projectName, clientName,
+      projectName, clientName, projectAddress,
       companyName:       contractor.companyName  || '',
       contractorPhone:   contractor.phone        || '',
       contractorEmail:   contractor.email        || '',
@@ -166,7 +202,8 @@ export default function QuoteBuilder({
       matSub, labSub, othSub,
       base, margin, profit, total,
       notes,
-      estimateNo: usedEstimateNo,
+      estimateNo,
+      validUntil,
     });
   };
 
@@ -296,16 +333,7 @@ export default function QuoteBuilder({
                   onClick={() => onQtyChange(item.id, +(item.qty - 1).toFixed(2))}
                   style={{ padding: '2px 7px', minWidth: 26, height: 26, lineHeight: 1, flexShrink: 0 }}>−</button>
 
-                <input
-                  type="number" min="0.01" step="0.01"
-                  value={item.qty}
-                  onChange={e => onQtyChange(item.id, Math.max(0.01, parseFloat(e.target.value) || 0))}
-                  style={{
-                    width: 54, textAlign: 'center', padding: '2px 4px', height: 26,
-                    background: 'var(--bg)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)', color: 'var(--text-primary)',
-                    fontSize: '0.82rem', fontFamily: 'var(--font)', flexShrink: 0,
-                  }} />
+                <QtyInput itemId={item.id} qty={item.qty} onQtyChange={onQtyChange} />
 
                 <button className="btn btn-ghost btn-sm"
                   onClick={() => onQtyChange(item.id, +(item.qty + 1).toFixed(2))}
@@ -410,16 +438,23 @@ export default function QuoteBuilder({
       </div>
 
       {/* ── Project / client info ── */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }} className="no-print">
-        <div style={{ flex: 1, minWidth: 150 }}>
-          <label className="label">Project Name</label>
-          <input className="input" placeholder="Smith Residence Addition"
-            value={projectName} onChange={e => onProjectNameChange(e.target.value)} />
+      <div style={{ marginBottom: 20 }} className="no-print">
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <label className="label">Project Name</label>
+            <input className="input" placeholder="Smith Residence Addition"
+              value={projectName} onChange={e => onProjectNameChange(e.target.value)} />
+          </div>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <label className="label">Client / Contact</label>
+            <input className="input" placeholder="John Smith"
+              value={clientName} onChange={e => onClientNameChange(e.target.value)} />
+          </div>
         </div>
-        <div style={{ flex: 1, minWidth: 150 }}>
-          <label className="label">Client / Contact</label>
-          <input className="input" placeholder="John Smith"
-            value={clientName} onChange={e => onClientNameChange(e.target.value)} />
+        <div>
+          <label className="label">Project Address</label>
+          <input className="input" placeholder="123 Main St, El Paso, TX 79901"
+            value={projectAddress} onChange={e => onProjectAddressChange(e.target.value)} />
         </div>
       </div>
 
@@ -451,42 +486,41 @@ export default function QuoteBuilder({
           <button
             onClick={() => setShowCustomForm(true)}
             style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '9px 14px',
-              background: 'var(--bg)', border: '1px dashed var(--border)',
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              padding: '11px 14px',
+              background: '#FFFBEB', border: '1.5px dashed #D97706',
               borderRadius: 'var(--radius-lg)', cursor: 'pointer',
-              fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-muted)',
+              fontSize: '0.84rem', fontWeight: 600, color: '#92400E',
               transition: 'border-color 0.15s, color 0.15s, background 0.15s',
+              letterSpacing: '-0.01em',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--border-dark)';
-              e.currentTarget.style.color = 'var(--text-primary)';
-              e.currentTarget.style.background = 'var(--surface-2)';
+              e.currentTarget.style.background = '#FEF3C7';
+              e.currentTarget.style.borderColor = '#B45309';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'var(--border)';
-              e.currentTarget.style.color = 'var(--text-muted)';
-              e.currentTarget.style.background = 'var(--bg)';
+              e.currentTarget.style.background = '#FFFBEB';
+              e.currentTarget.style.borderColor = '#D97706';
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M6.5 1v11M1 6.5h11"/>
             </svg>
             Add Custom Item
           </button>
         ) : (
           <div style={{
-            border: '1px solid var(--border)',
+            border: '1.5px solid #D97706',
             borderRadius: 'var(--radius-lg)',
-            background: 'var(--bg)',
+            background: '#FFFBEB',
             overflow: 'hidden',
           }}>
             <div style={{
               padding: '9px 14px',
-              borderBottom: '1px solid var(--border)',
+              borderBottom: '1px solid #FDE68A',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                 Custom Item
               </span>
               <button
@@ -642,11 +676,27 @@ export default function QuoteBuilder({
             </div>
           </div>
 
-          <div style={{ marginTop: 16 }} className="no-print">
+          <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }} className="no-print">
+            <div style={{ flex: '0 0 auto' }}>
+              <label className="label">Estimate Valid Until</label>
+              <input
+                className="input"
+                type="date"
+                value={validUntil}
+                onChange={e => onValidUntilChange(e.target.value)}
+                style={{ width: 160 }}
+              />
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', paddingBottom: 7, lineHeight: 1.4 }}>
+              Printed on the PDF — <br/>defaults to 30 days out
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12 }} className="no-print">
             <label className="label">Notes / Payment Terms</label>
             <textarea
               className="input"
-              placeholder="e.g. This estimate is valid for 30 days. Payment: 50% deposit upon signing, balance on completion."
+              placeholder="e.g. Payment: 50% deposit upon signing, balance on completion."
               value={notes}
               onChange={e => onNotesChange(e.target.value)}
               rows={3}

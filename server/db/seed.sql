@@ -22,9 +22,9 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (1, 'CMU Block (8" Standard)',        'Concrete masonry unit, standard gray',       'ea',      2.85,  'materials', 1,  '2024-09-01'),
   (1, 'CMU Block (4" Standard)',        'Concrete masonry unit, 4-inch',              'ea',      1.95,  'materials', 2,  '2024-09-01'),
   (1, 'Brick (Standard Modular)',       'Standard red facing brick',                  'ea',      0.88,  'materials', 3,  '2024-09-01'),
-  (1, 'Rebar #3 (3/8")',               'Deformed steel rebar, 20 ft stick',          'lf',      0.55,  'materials', 4,  '2024-11-01'),
-  (1, 'Rebar #4 (1/2")',               'Deformed steel rebar, 20 ft stick',          'lf',      0.78,  'materials', 5,  '2024-11-01'),
-  (1, 'Rebar #5 (5/8")',               'Deformed steel rebar, 20 ft stick',          'lf',      0.98,  'materials', 6,  '2024-11-01'),
+  (1, 'Rebar #3 (3/8")',               'Deformed steel rebar, 20 ft stick',          'ea',      9.50,  'materials', 4,  '2025-05-21'),
+  (1, 'Rebar #4 (1/2")',               'Deformed steel rebar, 20 ft stick',          'ea',     13.50,  'materials', 5,  '2025-05-21'),
+  (1, 'Rebar #5 (5/8")',               'Deformed steel rebar, 20 ft stick',          'ea',     19.75,  'materials', 6,  '2025-05-21'),
   (1, 'Wire Mesh 6x6 W1.4',            'Welded wire mesh for slabs',                 'sqft',    0.48,  'materials', 7,  '2024-11-01'),
   (1, 'Lumber 2x4x8',                  'SPF dimensional lumber',                     'ea',      5.65,  'materials', 8,  '2025-01-01'),
   (1, 'Lumber 2x4x10',                 'SPF dimensional lumber',                     'ea',      6.95,  'materials', 9,  '2025-01-01'),
@@ -56,7 +56,14 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (1, '14/2 NM-B Wire (Romex)',        'Non-metallic sheathed cable, 250 ft roll',  'lf',       0.72, 'materials', 35, '2024-10-01'),
   (1, 'Anchor Bolts 1/2"x10"',        'J-bolt concrete anchor, box of 50',          'ea',       1.25, 'materials', 36, '2024-07-01'),
   (1, 'Hurricane Straps H2.5',         'Rafter-to-plate connector, 50 ct box',      'ea',       1.85, 'materials', 37, '2024-07-01'),
-  (1, 'Joist Hanger LUS26',            'Single 2x6 joist hanger',                   'ea',       2.45, 'materials', 38, '2024-07-01');
+  (1, 'Joist Hanger LUS26',            'Single 2x6 joist hanger',                   'ea',       2.45, 'materials', 38, '2024-07-01'),
+  -- El Paso specific
+  (1, 'Caliche Base 6in Compacted',    '6-inch caliche base course, graded and compacted',       'sqft',  2.80, 'other',     39, '2025-05-21'),
+  (1, 'Block Wall 8in CMU Installed',  '8-inch CMU, mortar, grout, labor per LF of wall',        'lf',   45.00, 'other',     40, '2025-05-21'),
+  (1, 'Desert Landscaping Xeriscape',  'Rock mulch, native plants, drip irrigation layout',      'sqft',  3.50, 'other',     41, '2025-05-21'),
+  (1, 'Chain Link Fence 4ft Installed','4-ft galvanized chain link, posts, top rail, L+M',       'lf',   18.00, 'other',     42, '2025-05-21'),
+  (1, 'Wrought Iron Fence Installed',  'Custom fabricated wrought iron fence, installed per LF', 'lf',   65.00, 'other',     43, '2025-05-21'),
+  (1, 'Gravel Driveway Caliche',       'Caliche or crushed stone base, graded and compacted',    'sqft',  1.80, 'other',     44, '2025-05-21');
 
 -- ──────────────────────────────────────────────
 -- LABOR (standalone crew rates)
@@ -98,7 +105,8 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (3, 'Fiber Mesh Additive',           'Polypropylene fiber per yard of concrete',  'cu yd',    8.00, 'materials', 9,  '2024-10-01'),
   (3, 'Accelerator Admixture',         'Cold-weather set accelerator per yard',     'cu yd',    6.50, 'materials', 10, '2024-10-01'),
   (3, 'Concrete Saw Cutting',          'Control joint saw cut per linear foot',     'lf',       1.85, 'other',     11, '2024-10-01'),
-  (3, 'Vapor Barrier 10-mil',          'Polyethylene under-slab vapor barrier',     'sqft',     0.22, 'materials', 12, '2024-10-01');
+  (3, 'Vapor Barrier 10-mil',          'Polyethylene under-slab vapor barrier',     'sqft',     0.22, 'materials', 12, '2024-10-01'),
+  (3, 'Concrete Retaining Wall',       'CMU or poured concrete retaining wall, L+M per LF', 'lf', 85.00, 'other',    13, '2025-05-21');
 
 -- ──────────────────────────────────────────────
 -- PLUMBING
@@ -164,7 +172,10 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (6, 'Supply/Return Grille Install',  'Register + boot install',                  'ea',      85.00, 'other',     13, '2024-10-01'),
   (6, 'Thermostat (Smart) Install',   'Nest/Ecobee or equivalent, L+M',           'ea',     225.00, 'other',     14, '2024-10-01'),
   (6, 'AC Refrigerant Recharge R-410A','Per pound of refrigerant added',           'lb',      65.00, 'other',     15, '2025-02-01'),
-  (6, 'Attic Ventilation Fan',         'Solar or electric attic fan, L+M',         'ea',     485.00, 'other',     16, '2024-10-01');
+  (6, 'Attic Ventilation Fan',         'Solar or electric attic fan, L+M',         'ea',     485.00, 'other',     16, '2024-10-01'),
+  -- El Paso specific — evap coolers are the dominant cooling method
+  (6, 'Evaporative Cooler 4500 CFM',   'Roof or window mount ducted swamp cooler, L+M', 'ea', 1200.00, 'other',   17, '2025-05-21'),
+  (6, 'Evaporative Cooler 5500 CFM',   'Roof or window mount ducted swamp cooler, L+M', 'ea', 1600.00, 'other',   18, '2025-05-21');
 
 -- ──────────────────────────────────────────────
 -- FRAMING
@@ -231,7 +242,11 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (9, 'Countertop — Granite (L+M)',    'Granite slab, fabricate + install',         'sqft',    75.00, 'other',    22, '2024-11-01'),
   (9, 'Countertop — Quartz (L+M)',     'Engineered quartz, fab + install',          'sqft',    85.00, 'other',    23, '2024-11-01'),
   (9, 'Backsplash Tile (L+M)',         '4x4 ceramic or subway tile, L+M',           'sqft',   18.50, 'other',    24, '2024-11-01'),
-  (9, 'Caulking / Sealants (Labor)',   'Bathroom, kitchen, exterior caulk labor',  'hr',      28.00, 'labor',    25, '2024-09-01');
+  (9, 'Caulking / Sealants (Labor)',   'Bathroom, kitchen, exterior caulk labor',  'hr',      28.00, 'labor',    25, '2024-09-01'),
+  -- El Paso specific
+  (9, 'Stucco Three-Coat System',      'Scratch, brown, and finish coat, L+M',      'sqft',    4.50, 'other',    26, '2025-05-21'),
+  (9, 'Saltillo Tile 12x12 Supply+Install', 'Mexican saltillo tile, supply and install, grout incl.', 'sqft', 8.50, 'other', 27, '2025-05-21'),
+  (9, 'Stucco Repair Patch',           'Match existing stucco texture and color, L+M', 'sqft',  6.00, 'other',   28, '2025-05-21');
 
 -- ──────────────────────────────────────────────
 -- EQUIPMENT RENTAL

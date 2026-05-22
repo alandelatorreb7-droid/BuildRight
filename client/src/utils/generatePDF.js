@@ -17,13 +17,14 @@ const STR = [252, 252, 254]; // table stripe
 const SUB = [243, 244, 248]; // subtotal row bg
 
 export function generatePDF({
-  projectName, clientName,
+  projectName, clientName, projectAddress,
   companyName, contractorPhone, contractorEmail, contractorLicense,
   materials, labor, other,
   matSub, labSub, othSub,
   base, margin, profit, total,
   notes,
   estimateNo,
+  validUntil,
 }) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const W  = doc.internal.pageSize.getWidth();   // 215.9 mm
@@ -73,19 +74,26 @@ export function generatePDF({
   set('helvetica', 'bold', 22, RST);
   doc.text('ESTIMATE', W - MR, 35, { align: 'right' });
 
-  const usedEstimateNo = estimateNo || (() => {
-    const now = new Date();
-    return `EST-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-  })();
   const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
 
   set('helvetica', 'normal', 8.5, MUT);
-  doc.text(`No. ${usedEstimateNo}`, W - MR, 44,   { align: 'right' });
+  doc.text(`No. ${estimateNo}`, W - MR, 44, { align: 'right' });
   doc.text(dateStr,             W - MR, 49.5, { align: 'right' });
 
-  let y = Math.max(leftY, 54) + 5;
+  let rightBottomY = 54;
+  if (validUntil) {
+    const [yr, mo, dy] = validUntil.split('-').map(Number);
+    const validStr = new Date(yr, mo - 1, dy).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+    set('helvetica', 'bold', 8.5, AMB);
+    doc.text(`Valid Until: ${validStr}`, W - MR, 55, { align: 'right' });
+    rightBottomY = 60;
+  }
+
+  let y = Math.max(leftY, rightBottomY) + 5;
 
   // ── 3. Separator ──────────────────────────────────────────────────────────
   doc.setDrawColor(...BDR);
@@ -94,9 +102,9 @@ export function generatePDF({
   y += 7;
 
   // ── 4. Project / client box ───────────────────────────────────────────────
-  if (projectName || clientName) {
-    const lines  = [projectName, clientName].filter(Boolean);
-    const boxH   = 9 + lines.length * 5.5 + 3;
+  if (projectName || clientName || projectAddress) {
+    const lines = [projectName, clientName, projectAddress].filter(Boolean);
+    const boxH  = 9 + lines.length * 5.5 + 3;
 
     doc.setFillColor(...BG);
     doc.roundedRect(ML, y, CW, boxH, 2, 2, 'F');
@@ -116,6 +124,11 @@ export function generatePDF({
     if (clientName) {
       set('helvetica', 'normal', 9, MUT);
       doc.text(clientName, ML + 7, bY);
+      bY += 5.5;
+    }
+    if (projectAddress) {
+      set('helvetica', 'normal', 8.5, MUT);
+      doc.text(projectAddress, ML + 7, bY);
     }
     y += boxH + 7;
   }
@@ -157,11 +170,11 @@ export function generatePDF({
       ]);
     });
 
-    // Subtotal row
+    // Subtotal row — label spans Unit+UnitPrice cols (43 mm) so it never truncates
     body.push([
-      { content: '', colSpan: 4, styles: { fillColor: SUB } },
-      { content: `${title} Subtotal`, styles: { fillColor: SUB, fontStyle: 'bold', fontSize: 8, halign: 'right', textColor: MUT } },
-      { content: fmt(sub),            styles: { fillColor: SUB, fontStyle: 'bold', halign: 'right', textColor: TXT } },
+      { content: '', colSpan: 3, styles: { fillColor: SUB } },
+      { content: `${title} Subtotal`, colSpan: 2, styles: { fillColor: SUB, fontStyle: 'bold', fontSize: 8, halign: 'right', textColor: MUT, overflow: 'linebreak' } },
+      { content: fmt(sub),                        styles: { fillColor: SUB, fontStyle: 'bold', halign: 'right', textColor: TXT } },
     ]);
   };
 
@@ -308,7 +321,7 @@ export function generatePDF({
   set('helvetica', 'normal', 8, MUT);
   const notesContent = notes && notes.trim()
     ? notes.trim()
-    : 'This estimate is valid for 30 days from the date shown above. Prices reflect current material and labor costs for El Paso, TX. Final costs may vary based on actual site conditions and material availability.';
+    : 'This estimate is valid through the date shown above. Prices reflect current material and labor costs for El Paso, TX. Final costs may vary based on actual site conditions and material availability.';
   const noteLines = doc.splitTextToSize(notesContent, CW);
   noteLines.forEach(line => { doc.text(line, ML, y); y += 4.5; });
 

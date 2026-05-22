@@ -78,11 +78,14 @@ router.put('/items/:id', adminAuth, async (req, res) => {
   }
 });
 
-// DELETE item
+// DELETE item (soft delete — sets is_active = false)
 router.delete('/items/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await db.query('DELETE FROM items WHERE id = $1 RETURNING id', [id]);
+    const result = await db.query(
+      'UPDATE items SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING id',
+      [id]
+    );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
     res.json({ deleted: true });
   } catch (err) {
