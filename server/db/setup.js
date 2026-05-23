@@ -6,19 +6,26 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 async function setup() {
   const client = await pool.connect();
   try {
-    console.log('Creating database schema...');
+    // Always run schema — CREATE TABLE IF NOT EXISTS makes this safe to re-run
+    console.log('Ensuring database schema...');
     const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
     await client.query(schema);
-    console.log('Schema created.');
+    console.log('Schema ready.');
 
-    console.log('Seeding data...');
-    const seed = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
-    await client.query(seed);
-    console.log('Seed data inserted.');
+    // Only seed if the database is empty ��� prevents wiping data on every deploy
+    const { rows } = await client.query('SELECT COUNT(*) AS count FROM categories');
+    if (parseInt(rows[0].count) === 0) {
+      console.log('Empty database — seeding catalog data...');
+      const seed = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
+      await client.query(seed);
+      console.log('Catalog seeded successfully.');
+    } else {
+      console.log(`Database already contains ${rows[0].count} categories — skipping seed.`);
+    }
 
-    console.log('\nBuildRight database ready!');
+    console.log('BuildRight database ready.');
   } catch (err) {
-    console.error('Setup failed:', err.message);
+    console.error('Database setup failed:', err.message);
     process.exit(1);
   } finally {
     client.release();

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const rateLimit = require('express-rate-limit');
 const categoriesRouter = require('./routes/categories');
 const itemsRouter = require('./routes/items');
@@ -41,6 +42,15 @@ app.use('/api/admin', adminRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+// Serve built React frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '../client/dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
 app.listen(PORT, () => {
-  console.log(`BuildRight API running on http://localhost:${PORT}`);
+  console.log(`BuildRight API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 });
