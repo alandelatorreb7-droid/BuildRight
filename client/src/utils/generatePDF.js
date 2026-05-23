@@ -319,11 +319,16 @@ export function generatePDF({
   y += 5;
 
   set('helvetica', 'normal', 8, MUT);
-  const notesContent = notes && notes.trim()
-    ? notes.trim()
-    : 'This estimate is valid through the date shown above. Prices reflect current material and labor costs for El Paso, TX. Final costs may vary based on actual site conditions and material availability.';
-  const noteLines = doc.splitTextToSize(notesContent, CW);
-  noteLines.forEach(line => { doc.text(line, ML, y); y += 4.5; });
+  if (notes && notes.trim()) {
+    const noteLines = doc.splitTextToSize(notes.trim(), CW);
+    noteLines.forEach(line => { doc.text(line, ML, y); y += 4.5; });
+    y += 3;
+  }
+
+  const disclaimer = 'This estimate is generated for preliminary budgeting purposes only. Final costs may vary based on site conditions, material availability, and contractor pricing. BuildRight is not responsible for discrepancies between estimated and actual project costs. Always confirm prices with local suppliers before submitting final bids.';
+  set('helvetica', 'italic', 7.5, MUT);
+  const discLines = doc.splitTextToSize(disclaimer, CW);
+  discLines.forEach(line => { doc.text(line, ML, y); y += 4.2; });
 
   // ── 8. Signature lines ────────────────────────────────────────────────────
   y += 8;

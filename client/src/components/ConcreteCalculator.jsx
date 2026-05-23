@@ -143,7 +143,7 @@ export default function ConcreteCalculator({ onAddCuYard, concreteItems = [] }) 
                   <select
                     className="select"
                     value={effectiveItemId ?? ''}
-                    onChange={e => setSelectedItemId(e.target.value)}
+                    onChange={e => setSelectedItemId(Number(e.target.value))}
                   >
                     {concreteItems.map(item => (
                       <option key={item.id} value={item.id}>

@@ -3,17 +3,18 @@
 TRUNCATE items, categories RESTART IDENTITY CASCADE;
 
 INSERT INTO categories (name, slug, icon, sort_order) VALUES
-  ('Materials',        'materials',       '🧱', 1),
-  ('Labor',            'labor',           '👷', 2),
-  ('Concrete',         'concrete',        '🏗️', 3),
-  ('Plumbing',         'plumbing',        '🔧', 4),
-  ('Electrical',       'electrical',      '⚡', 5),
-  ('HVAC',             'hvac',            '❄️', 6),
-  ('Framing',          'framing',         '🪵', 7),
-  ('Roofing',          'roofing',         '🏠', 8),
-  ('Finishes',         'finishes',        '🎨', 9),
-  ('Equipment Rental', 'equipment',       '🚜', 10),
-  ('Permits & Fees',   'permits',         '📋', 11);
+  ('Materials',              'materials',  '🧱', 1),
+  ('Labor',                  'labor',      '👷', 2),
+  ('Concrete',               'concrete',   '🏗️', 3),
+  ('Plumbing',               'plumbing',   '🔧', 4),
+  ('Electrical',             'electrical', '⚡', 5),
+  ('HVAC',                   'hvac',       '❄️', 6),
+  ('Framing',                'framing',    '🪵', 7),
+  ('Roofing',                'roofing',    '🏠', 8),
+  ('Finishes',               'finishes',   '🎨', 9),
+  ('Equipment Rental',       'equipment',  '🚜', 10),
+  ('Permits & Fees',         'permits',    '📋', 11),
+  ('Bathroom & Accessories', 'bathroom',   '🚿', 12);
 
 -- ──────────────────────────────────────────────
 -- MATERIALS
@@ -37,7 +38,7 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (1, 'OSB 4x8 7/16"',               'Oriented strand board sheathing',             'sheet',  28.75,  'materials', 16, '2025-01-01'),
   (1, 'Drywall 4x8 1/2"',            'Standard gypsum board',                       'sheet',  14.85,  'materials', 17, '2024-10-01'),
   (1, 'Drywall 4x12 1/2"',           'Standard gypsum board, long sheet',           'sheet',  22.50,  'materials', 18, '2024-10-01'),
-  (1, 'Drywall 4x8 5/8" Type-X',     'Fire-rated gypsum board',                    'sheet',  18.95,  'materials', 19, '2024-10-01'),
+  (1, 'Drywall 4x8 5/8" Type-X',     'Fire-rated gypsum board',                    'sheet',  19.75,  'materials', 19, '2026-05-22'),
   (1, 'Insulation R-13 Batt',         'Fiberglass batt, 2x4 wall cavity',           'sqft',    0.65,  'materials', 20, '2024-09-01'),
   (1, 'Insulation R-19 Batt',         'Fiberglass batt, 2x6 wall cavity',           'sqft',    0.88,  'materials', 21, '2024-09-01'),
   (1, 'Insulation R-30 Batt',         'Attic fiberglass batt',                      'sqft',    1.15,  'materials', 22, '2024-09-01'),
@@ -63,7 +64,30 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (1, 'Desert Landscaping Xeriscape',  'Rock mulch, native plants, drip irrigation layout',      'sqft',  3.50, 'other',     41, '2025-05-21'),
   (1, 'Chain Link Fence 4ft Installed','4-ft galvanized chain link, posts, top rail, L+M',       'lf',   18.00, 'other',     42, '2025-05-21'),
   (1, 'Wrought Iron Fence Installed',  'Custom fabricated wrought iron fence, installed per LF', 'lf',   65.00, 'other',     43, '2025-05-21'),
-  (1, 'Gravel Driveway Caliche',       'Caliche or crushed stone base, graded and compacted',    'sqft',  1.80, 'other',     44, '2025-05-21');
+  (1, 'Gravel Driveway Caliche',       'Caliche or crushed stone base, graded and compacted',    'sqft',  1.80, 'other',     44, '2025-05-21'),
+  (1, 'Insulation R-13 Batt (bag)',   'Fiberglass batt 2x4 wall cavity, per bag',               'bag',  38.00, 'materials', 45, '2026-05-22'),
+  (1, 'Drywall Screws 1lb',           'Coarse thread drywall screws 1-5/8", 1lb box',           'box',   9.50, 'materials', 46, '2026-05-22'),
+  (1, 'Framing Screws (box)',          'Self-drilling metal framing screws, box',                 'box',  15.00, 'materials', 47, '2026-05-22'),
+  (1, 'Tapcon Anchors 1/4" (box)',     'Concrete screw anchors 1/4" x 1-3/4", box',             'box',  22.00, 'materials', 48, '2026-05-22'),
+  (1, 'Joint Compound 4.5 gal',        'All-purpose joint compound, 4.5 gallon bucket',         'bucket',21.00, 'materials', 49, '2026-05-22'),
+  (1, 'Drywall Tape 250ft',            'Paper joint tape, 250ft roll',                          'roll',  6.00, 'materials', 50, '2026-05-22'),
+  (1, 'Corner Bead 8ft metal',         'Metal corner bead, 8ft stick',                          'ea',    4.50, 'materials', 51, '2026-05-22'),
+  (1, 'Interior Drywall Primer 1 gal', 'PVA drywall primer, 1 gallon',                          'gallon',26.00, 'materials', 52, '2026-05-22'),
+  (1, 'Vinyl Acrylic Paint 1 gal',     'Interior latex paint, 1 gallon',                        'gallon',45.00, 'materials', 53, '2026-05-22'),
+  (1, 'Sanding Sponge medium grit',    'Medium grit dual-angle sanding sponge',                  'ea',    4.50, 'materials', 54, '2026-05-22'),
+  (1, 'Grout Sanded 25lb',             'Sanded tile grout, 25lb bag',                           'bag',  24.00, 'materials', 55, '2026-05-22'),
+  -- Beams & Posts
+  (1, '4x4x8 Post Pressure Treated',   'PT 4x4x8 structural post, ground contact rated',        'ea',   19.00, 'materials', 56, '2026-05-22'),
+  (1, '4x6x8 Beam Douglas Fir',        'Douglas fir 4x6x8 structural beam',                     'ea',   28.00, 'materials', 57, '2026-05-22'),
+  (1, '4x8x12 Beam Douglas Fir',       'Douglas fir 4x8x12 structural beam',                    'ea',   52.00, 'materials', 58, '2026-05-22'),
+  (1, '4x10x12 Beam Douglas Fir',      'Douglas fir 4x10x12 structural beam',                   'ea',   68.00, 'materials', 59, '2026-05-22'),
+  (1, '4x12x12 Beam Douglas Fir',      'Douglas fir 4x12x12 structural beam',                   'ea',   85.00, 'materials', 60, '2026-05-22'),
+  (1, '6x6x8 Post Pressure Treated',   'PT 6x6x8 heavy-duty structural post, ground contact',   'ea',   42.00, 'materials', 61, '2026-05-22'),
+  (1, '6x8x12 Beam Douglas Fir',       'Douglas fir 6x8x12 heavy structural beam',              'ea',   95.00, 'materials', 62, '2026-05-22'),
+  (1, 'LVL Beam 1.75x9.5x16ft',        'Laminated veneer lumber, 1.75" x 9.5" x 16ft',         'ea',  148.00, 'materials', 63, '2026-05-22'),
+  (1, 'LVL Beam 1.75x11.25x16ft',      'Laminated veneer lumber, 1.75" x 11.25" x 16ft',       'ea',  185.00, 'materials', 64, '2026-05-22'),
+  (1, 'LVL Beam 1.75x14x16ft',         'Laminated veneer lumber, 1.75" x 14" x 16ft',           'ea',  235.00, 'materials', 65, '2026-05-22'),
+  (1, 'LVL Beam 3.5x9.5x16ft',         'Laminated veneer lumber, 3.5" x 9.5" x 16ft (double)', 'ea',  285.00, 'materials', 66, '2026-05-22');
 
 -- ──────────────────────────────────────────────
 -- LABOR (standalone crew rates)
@@ -127,7 +151,30 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (4, 'Vanity Faucet Install',         'Single or double handle, supply lines',    'ea',     135.00, 'labor',     13, '2025-01-01'),
   (4, 'Kitchen Faucet Install',        'Kitchen faucet with supply lines',         'ea',     165.00, 'labor',     14, '2025-01-01'),
   (4, 'Garbage Disposal Install',      'Disposal unit installation, no unit',      'ea',     145.00, 'labor',     15, '2025-01-01'),
-  (4, 'Backflow Preventer Install',    'RPZ or dual-check, L+M',                   'ea',     425.00, 'other',     16, '2024-09-01');
+  (4, 'Backflow Preventer Install',    'RPZ or dual-check, L+M',                   'ea',     425.00, 'other',     16, '2024-09-01'),
+  (4, 'PEX Pipe 1/2" 100ft roll',     'PEX-A tubing, 1/2" x 100ft roll',                       'roll',  52.00, 'materials', 17, '2026-05-22'),
+  (4, 'Copper Pipe 1/2" Type L 10ft', 'Type L copper supply pipe, 10ft stick',                  'ea',    26.00, 'materials', 18, '2026-05-22'),
+  (4, 'Ball Valve 1/2" brass',        'Full-port brass ball valve, 1/2"',                       'ea',    14.00, 'materials', 19, '2026-05-22'),
+  (4, 'Angle Stop Valve 1/2"x3/8"',  'Compression angle stop, 1/2" IPS x 3/8" OD',            'ea',    11.00, 'materials', 20, '2026-05-22'),
+  (4, 'Pipe Insulation foam 6ft',     'Foam pipe wrap, 1/2" ID x 6ft stick',                    'ea',     5.50, 'materials', 21, '2026-05-22'),
+  (4, 'Pipe Hangers (bag)',           'Plastic pipe clamps/hangers, bag of 25',                  'bag',    9.00, 'materials', 22, '2026-05-22'),
+  (4, 'PVC Pipe 2" Sch 40 10ft',      'Schedule 40 PVC DWV pipe, 2" x 10ft stick',              'ea',    15.00, 'materials', 23, '2026-05-22'),
+  (4, 'PVC Pipe 3" Sch 40 10ft',      'Schedule 40 PVC DWV pipe, 3" x 10ft stick',              'ea',    22.00, 'materials', 24, '2026-05-22'),
+  (4, 'PVC Elbow 90°',               'Schedule 40 PVC street elbow, 90 degree',                 'ea',     3.50, 'materials', 25, '2026-05-22'),
+  (4, 'PVC Tee sanitary',             'Schedule 40 PVC sanitary tee',                            'ea',     6.50, 'materials', 26, '2026-05-22'),
+  (4, 'PVC Coupling',                 'Schedule 40 PVC slip coupling',                           'ea',     2.50, 'materials', 27, '2026-05-22'),
+  (4, 'Closet Flange PVC',            'PVC closet flange with ring, 4"x3"',                      'ea',    12.00, 'materials', 28, '2026-05-22'),
+  (4, 'PVC Primer purple',            'Purple PVC primer, 4 oz can',                             'can',   11.00, 'materials', 29, '2026-05-22'),
+  (4, 'PVC Cement',                   'Clear medium-body PVC cement, 4 oz can',                  'can',   11.00, 'materials', 30, '2026-05-22'),
+  (4, 'Toilet elongated commercial',  'Commercial-grade elongated toilet, white',                 'ea',   285.00, 'materials', 31, '2026-05-22'),
+  (4, 'Lavatory Sink wall mount',     'Commercial wall-mount lavatory sink, white',               'ea',   185.00, 'materials', 32, '2026-05-22'),
+  (4, 'Faucet commercial chrome',     'Commercial 4" centerset faucet, chrome finish',            'ea',   145.00, 'materials', 33, '2026-05-22'),
+  (4, 'P-Trap 1-1/4"',               'Chrome or PVC P-trap, 1-1/4"',                             'ea',    15.00, 'materials', 34, '2026-05-22'),
+  (4, 'Supply Lines braided (pair)',   'Braided stainless supply lines, 12" pair',                'pair',  14.00, 'materials', 35, '2026-05-22'),
+  (4, 'Wax Ring toilet seal',         'Standard toilet wax ring with horn',                      'ea',     7.50, 'materials', 36, '2026-05-22'),
+  (4, 'Silicone Sealant tube',        'Waterproof silicone sealant, 10.3 oz tube',               'tube',   9.00, 'materials', 37, '2026-05-22'),
+  (4, 'Floor Drain commercial',       'Commercial floor drain assembly, 4" cast iron',           'ea',    85.00, 'materials', 38, '2026-05-22'),
+  (4, 'Cleanout Cover PVC',           'PVC cleanout plug and cover, 4"',                         'ea',    16.00, 'materials', 39, '2026-05-22');
 
 -- ──────────────────────────────────────────────
 -- ELECTRICAL
@@ -151,7 +198,12 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (5, 'EV Charger (Level 2)',          '240V EVSE circuit + outlet, L+M',          'ea',     850.00, 'other',     16, '2024-12-01'),
   (5, 'Dedicated Circuit (240V)',      'New 240V circuit, 30-50A, L+M',            'ea',     385.00, 'other',     17, '2024-08-01'),
   (5, 'Conduit Run (EMT, per LF)',     'EMT conduit with wire, L+M/lf',            'lf',       8.50, 'other',     18, '2024-08-01'),
-  (5, 'Whole-House Generator Hook-Up', 'Transfer switch + generator tie-in, L+M', 'ea',    1850.00, 'other',     19, '2024-12-01');
+  (5, 'Whole-House Generator Hook-Up', 'Transfer switch + generator tie-in, L+M', 'ea',    1850.00, 'other',     19, '2024-12-01'),
+  (5, 'LED Light Fixture commercial',    'Commercial LED troffer ceiling fixture, 2x4',       'ea',   145.00, 'materials', 20, '2026-05-22'),
+  (5, 'Exhaust Fan bathroom (unit)',      'Bathroom exhaust fan unit, 110 CFM',                'ea',   185.00, 'materials', 21, '2026-05-22'),
+  (5, 'GFCI Outlet (device)',             'GFCI receptacle device only, 15A 125V',             'ea',    22.00, 'materials', 22, '2026-05-22'),
+  (5, 'Light Switch commercial (device)','Commercial-grade single-pole switch device',         'ea',    14.00, 'materials', 23, '2026-05-22'),
+  (5, 'Electrical Conduit EMT 10ft',      '1/2" EMT electrical metallic conduit, 10ft stick', 'ea',    28.00, 'materials', 24, '2026-05-22');
 
 -- ──────────────────────────────────────────────
 -- HVAC
@@ -192,7 +244,9 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (7, 'Blocking and Bridging',         'Fire blocking / solid bridging, labor/lf', 'lf',       4.50, 'labor',     9,  '2024-07-01'),
   (7, 'Sub-Floor Install (Labor)',     'OSB sub-floor, labor per sqft',            'sqft',     1.85, 'labor',     10, '2024-07-01'),
   (7, 'Stair Framing (Labor)',         'Stair stringers, treads, per flight',      'ea',     850.00, 'labor',     11, '2025-01-01'),
-  (7, 'Crane Rental (Framing)',        '50-ton hydraulic crane, 4-hr min',         'day',   1850.00, 'other',     12, '2025-01-01');
+  (7, 'Crane Rental (Framing)',        '50-ton hydraulic crane, 4-hr min',         'day',   1850.00, 'other',     12, '2025-01-01'),
+  (7, 'Metal Stud 3-5/8" x 10ft',    'Steel stud 25-gauge, 3-5/8" wide x 10ft',  'ea',       8.50, 'materials', 13, '2026-05-22'),
+  (7, 'Metal Track 3-5/8" x 10ft',   'Steel track 25-gauge, 3-5/8" wide x 10ft', 'ea',       6.00, 'materials', 14, '2026-05-22');
 
 -- ──────────────────────────────────────────────
 -- ROOFING
@@ -290,3 +344,21 @@ INSERT INTO items (category_id, name, description, unit, unit_price, item_type, 
   (11, 'Certificate of Occupancy',     'C of O application fee',                  'ea',     125.00, 'other',     14, '2024-01-01'),
   (11, 'Variance Application',         'Zoning variance request fee',             'ea',     485.00, 'other',     15, '2024-01-01'),
   (11, 'Asbestos Survey (per bldg)',   'Required for pre-1980 demo projects',     'ea',     650.00, 'other',     16, '2024-01-01');
+
+-- ──────────────────────────────────────────────
+-- BATHROOM & ACCESSORIES
+-- ──────────────────────────────────────────────
+INSERT INTO items (category_id, name, description, unit, unit_price, item_type, sort_order, price_updated_at) VALUES
+  (12, 'Mirror frameless commercial',       'Frameless commercial-grade plate glass mirror',          'ea',   145.00, 'materials',  1, '2026-05-22'),
+  (12, 'Toilet Paper Dispenser SS',         'Surface-mount stainless steel TP dispenser',             'ea',    55.00, 'materials',  2, '2026-05-22'),
+  (12, 'Soap Dispenser wall mount',         'Stainless wall-mount liquid soap dispenser',             'ea',    45.00, 'materials',  3, '2026-05-22'),
+  (12, 'Paper Towel Dispenser SS',          'Surface-mount stainless paper towel dispenser',          'ea',   110.00, 'materials',  4, '2026-05-22'),
+  (12, 'Hand Dryer commercial electric',    'Commercial 110V electric hand dryer',                    'ea',   385.00, 'materials',  5, '2026-05-22'),
+  (12, 'Grab Bar ADA stainless 36in',       'ADA-compliant 36" stainless steel grab bar',             'ea',    75.00, 'materials',  6, '2026-05-22'),
+  (12, 'Trash Receptacle stainless',        'Commercial stainless step-on trash receptacle',          'ea',    85.00, 'materials',  7, '2026-05-22'),
+  (12, 'Coat Hook stainless wall',          'Stainless steel wall-mount coat/robe hook',              'ea',    14.00, 'materials',  8, '2026-05-22'),
+  (12, 'Door Stop commercial',              'Commercial floor or wall-mount door stop',               'ea',    16.00, 'materials',  9, '2026-05-22'),
+  (12, 'Restroom Signage ADA',              'ADA compliant restroom sign with braille',               'ea',    32.00, 'materials', 10, '2026-05-22'),
+  (12, 'Partition Panels bathroom stall',   'Powder-coated steel toilet partition panel',             'ea',   750.00, 'materials', 11, '2026-05-22'),
+  (12, 'Partition Hardware set',            'Complete toilet stall hardware set',                     'set',  140.00, 'materials', 12, '2026-05-22'),
+  (12, 'Vanity Countertop quartz',          'Engineered quartz vanity countertop, per sf',            'sf',    70.00, 'materials', 13, '2026-05-22');

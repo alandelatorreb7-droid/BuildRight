@@ -688,8 +688,8 @@ export default function QuotePage() {
               <ConcreteCalculator
                 concreteItems={allItems.filter(i => i.category_slug === 'concrete' && i.unit === 'cu yd')}
                 onAddCuYard={(cuYd, itemId) => {
-                  const item = allItems.find(i => i.id === itemId);
-                  if (!item) return 'Selected concrete item not found in price list.';
+                  const item = allItems.find(i => i.id === Number(itemId));
+                  if (!item) return `Concrete item (ID ${itemId}) not found — try refreshing the page to reload the price list.`;
                   const existing = quoteItems.find(q => q.id === item.id);
                   const newItems = existing
                     ? quoteItems.map(q => q.id === item.id ? { ...q, qty: +(q.qty + cuYd).toFixed(2) } : q)

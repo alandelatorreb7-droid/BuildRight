@@ -11,18 +11,7 @@ const benefits = [
       </svg>
     ),
     title: 'Build quotes in minutes',
-    desc: 'Click to add items, adjust quantities, and generate a professional estimate fast.',
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 19L11 3l8 16H3z"/>
-        <path d="M7 13h8"/>
-        <circle cx="11" cy="10" r="1" fill="currentColor" stroke="none"/>
-      </svg>
-    ),
-    title: '200+ El Paso prices built in',
-    desc: 'Current local market rates for materials, labor, concrete, HVAC, and more.',
+    desc: '280+ El Paso prices built in — click to add items and generate an estimate fast.',
   },
   {
     icon: (
@@ -33,7 +22,18 @@ const benefits = [
       </svg>
     ),
     title: 'Professional PDF output',
-    desc: 'Send clients a branded estimate with your company info, line items, and valid-until date.',
+    desc: 'Branded estimates with your company info and line items — ready to share with clients.',
+  },
+  {
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 19L11 3l8 16H3z"/>
+        <path d="M7 13h8"/>
+        <circle cx="11" cy="10" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+    ),
+    title: 'Residential focused',
+    desc: 'Room additions, remodels, concrete work, and more — built for El Paso contractors.',
   },
 ];
 
@@ -100,14 +100,14 @@ export default function LandingPage() {
           color: 'var(--charcoal)',
           letterSpacing: '-0.035em',
           lineHeight: 1.15,
-          maxWidth: 560,
+          maxWidth: 600,
           marginBottom: 14,
         }}>
-          Professional Construction Estimates<br/>
+          Fast Residential Construction Estimates<br/>
           <span style={{ color: 'var(--rust)' }}>for El Paso Contractors</span>
         </h1>
 
-        {/* Description */}
+        {/* Subheadline */}
         <p style={{
           fontSize: '0.97rem',
           color: 'var(--text-secondary)',
@@ -115,9 +115,7 @@ export default function LandingPage() {
           maxWidth: 480,
           marginBottom: 36,
         }}>
-          BuildRight lets you build accurate job estimates in minutes using current El Paso market prices.
-          Add line items from a 200+ item catalog, customize quantities and margins, and download
-          a professional PDF ready to hand to your client — no spreadsheets, no guesswork.
+          Build accurate preliminary quotes in under 10 minutes using current El Paso market prices.
         </p>
 
         {/* Benefits */}
@@ -176,6 +174,20 @@ export default function LandingPage() {
             <path d="M2 7h10M8 3l4 4-4 4"/>
           </svg>
         </button>
+
+        {/* Disclaimer */}
+        <p style={{
+          fontSize: '0.72rem',
+          color: 'var(--text-muted)',
+          lineHeight: 1.6,
+          maxWidth: 480,
+          marginTop: 18,
+          opacity: 0.85,
+        }}>
+          BuildRight is a preliminary estimating tool for residential projects. Always confirm prices
+          with local suppliers before submitting final bids. Prices reflect El Paso, TX market averages
+          and may vary based on site conditions and material availability.
+        </p>
 
       </main>
 
