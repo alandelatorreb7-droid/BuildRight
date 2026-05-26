@@ -5,6 +5,7 @@ import ConcreteCalculator from './ConcreteCalculator';
 import { trackEvent } from '../analytics';
 import QuoteBuilder from './QuoteBuilder';
 import { QuickStartModal } from './ProjectTemplates';
+import { exportPriceList } from '../utils/exportPriceList';
 
 const CATEGORIES = [
   { name: 'All Items',        slug: 'all' },
@@ -139,6 +140,7 @@ export default function QuotePage() {
   const [renamingId,    setRenamingId]    = useState(null);
   const [renameVal,     setRenameVal]     = useState('');
   const [toast,         setToast]         = useState(null);
+  const [downloading,   setDownloading]   = useState(false);
 
   // Derived active quote
   const activeQuote = quotes.find(q => q.id === activeId) ?? quotes[0];
@@ -181,6 +183,21 @@ export default function QuotePage() {
       .then(data => { setAllItems(data); setLoading(false); })
       .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
+
+  // ── Download price list ──────────────────────────────────────────────────────
+
+  const handleDownloadPriceList = async () => {
+    if (downloading || loading || allItems.length === 0) return;
+    setDownloading(true);
+    try {
+      await exportPriceList(allItems);
+      trackEvent('price_list_downloaded');
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // ── Quote operations ─────────────────────────────────────────────────────────
 
@@ -608,14 +625,54 @@ export default function QuotePage() {
 
       {/* ── Desktop: sub-header ── */}
       {!isNarrow && (
-        <div style={{ background: '#fff', borderBottom: '1px solid var(--border)', padding: '16px 24px' }} className="no-print">
-          <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '-0.02em' }}>
-              Construction Cost Estimator
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-              El Paso, TX — 2024/2025 pricing. Browse categories, build your quote, and adjust your margin.
-            </p>
+        <div style={{ background: '#fff', borderBottom: '1px solid var(--border)', padding: '14px 24px' }} className="no-print">
+          <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '-0.02em' }}>
+                Construction Cost Estimator
+              </h1>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                El Paso, TX — 2024/2025 pricing. Browse categories, build your quote, and adjust your margin.
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadPriceList}
+              disabled={downloading || loading}
+              title="Export full catalog as Excel spreadsheet"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '8px 16px',
+                background: downloading || loading ? 'var(--surface-2)' : 'var(--charcoal)',
+                color: downloading || loading ? 'var(--text-muted)' : '#fff',
+                border: '1px solid transparent',
+                borderRadius: 'var(--radius)',
+                fontSize: '0.82rem', fontWeight: 600,
+                cursor: downloading || loading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s, color 0.15s',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+              onMouseEnter={e => { if (!downloading && !loading) e.currentTarget.style.background = 'var(--charcoal-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = downloading || loading ? 'var(--surface-2)' : 'var(--charcoal)'; }}
+            >
+              {downloading ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <line x1="9" y1="15" x2="15" y2="15"/>
+                  </svg>
+                  Download Price List
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
@@ -683,6 +740,47 @@ export default function QuotePage() {
                 value={search} onChange={e => setSearch(e.target.value)}
                 style={{ background: '#fff' }} />
             </div>
+
+            {/* Mobile: download button below search */}
+            {isNarrow && (
+              <div style={{ marginBottom: 14 }} className="no-print">
+                <button
+                  onClick={handleDownloadPriceList}
+                  disabled={downloading || loading}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    width: '100%', padding: '9px 16px',
+                    background: 'var(--surface)',
+                    color: downloading || loading ? 'var(--text-muted)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '0.82rem', fontWeight: 500,
+                    cursor: downloading || loading ? 'not-allowed' : 'pointer',
+                    opacity: downloading || loading ? 0.7 : 1,
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {downloading ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                      </svg>
+                      Exporting…
+                    </>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                      </svg>
+                      Download Price List (.xlsx)
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             <div style={{ display: showConcCalc ? 'block' : 'none' }}>
               <ConcreteCalculator

@@ -113,6 +113,48 @@ input, select, textarea { font-family: var(--font); }
 }
 .slide-up { animation: slideUp 0.22s cubic-bezier(0.32, 0.72, 0, 1); }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Feedback floating buttons ── */
+.feedback-btns {
+  position: fixed;
+  bottom: 24px;
+  right: 16px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 1023px) {
+  .feedback-btns {
+    bottom: 88px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+  }
+}
+
+/* Landing page: top-right, same row as header */
+.feedback-btns-top {
+  position: fixed;
+  top: 13px;
+  right: 16px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* On narrow screens hide text labels — icons only, no collision with header title */
+@media (max-width: 639px) {
+  .feedback-btns-top .btn-label {
+    display: none;
+  }
+}
+
 /* ── Print ── */
 @media print {
   .no-print { display: none !important; }
